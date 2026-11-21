@@ -1,0 +1,18 @@
+{
+  "name": "SyndicSahl — Gestion de Copropriété",
+  "short_name": "SyndicSahl",
+  "description": "Gestion simple et transparente d'immeuble et syndic au Maroc (reçus WhatsApp, factures et caisse en direct).",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F766E",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

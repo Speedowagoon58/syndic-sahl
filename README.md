@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SyndicSahl (سانديك ساهل) — Moroccan Apartment Building Syndic Manager MVP
 
-## Getting Started
+A mobile-first Web App (PWA) tailored for apartment buildings (*copropriétés*) in Morocco:
+- **Bilingual UI:** 1-tap switch between **Français (`FR`)** and **العربية (`AR` with RTL)**
+- **WhatsApp-First (0 MAD):** Pre-filled **Darija**, **French**, and **Arabic** `wa.me` templates for digital receipts, polite arrears reminders, and group transparency updates
+- **Zero-App Resident Transparency Link (`/r/[slug]`):** Neighbors see the live building treasury balance, monthly payment grid, and clickable photos of every bill/receipt without downloading an app or creating an account
+- **Printable Official Receipts (`/receipt/[id]`) & AG Financial Reports**
+- **Moroccan Monetization Flow:** 30-day free trial (or free forever for ≤8 lots), read-only soft-lock on expiry, **Virement Bancaire (RIB)** & **CashPlus / Wafacash** upgrade flow, and a founder `/admin` activation dashboard
 
-First, run the development server:
+---
+
+## 1. Run Locally (Zero Setup Required)
+
+By default, the app boots in **0-MAD Local/Demo Mode** (`localStorage`) pre-loaded with two realistic Moroccan sample buildings (**Résidence Atlas** in Casablanca and **Immeuble Majorelle** in Marrakech).
 
 ```bash
+cd C:\Users\boula\.gemini\antigravity\scratch\syndic-sahl
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
+- **Main Syndic App:** `http://localhost:3000`
+- **Public Resident Transparency Portal:** `http://localhost:3000/r/residence-atlas`
+- **Founder Admin Panel:** `http://localhost:3000/admin`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 2. Customize Your RIB, CashPlus & Brand Name
 
-## Learn More
+Edit **`src/lib/config.ts`**:
+- `APP_NAME` / `APP_NAME_AR`: Your brand name
+- `PLANS`: Semi-annual (`700 MAD`) and Annual (`1200 MAD`) pricing
+- `FOUNDER_BANK_NAME`, `FOUNDER_ACCOUNT_HOLDER`, `FOUNDER_RIB`: Your bank account details for *virement*
+- `FOUNDER_CASHPLUS_NAME`: Recipient name for CashPlus / Wafacash
+- `FOUNDER_WHATSAPP`: Your Moroccan WhatsApp number in international format (`"2126XXXXXXXX"`)
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 3. Deploy for Free (Vercel) + Connect Supabase (When Ready)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Deploy Frontend (0 MAD):** Push this folder to GitHub and import it into [Vercel](https://vercel.com).
+2. **Optional Cloud Database (0 MAD):**
+   - Create a free project on [Supabase](https://supabase.com).
+   - Paste and run **`supabase/schema.sql`** in the Supabase SQL Editor (creates all 5 tables, indexes, strict Row-Level Security policies, and the private `receipts` storage bucket).
+   - Copy `.env.example` to `.env.local` and fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
