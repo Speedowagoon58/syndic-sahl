@@ -349,6 +349,37 @@ export function createSeedData(now: Date = new Date()): AppData {
     expenses,
     subscriptionRequests,
     memberships: [],
+    announcements: [
+      {
+        id: "ann-demo-1",
+        buildingId: b1Id,
+        title: "Nettoyage réservoir d'eau & minuterie hall",
+        body: "Le nettoyage semestriel du réservoir et le contrôle de la minuterie auront lieu samedi matin de 9h à 12h. Coupure d'eau prévue 1h30.",
+        category: "travaux",
+        pinned: true,
+        authorName: "Syndic Résidence Atlas",
+        createdAt: `${m0}-06T09:30:00.000Z`,
+      },
+    ],
+    tickets: [
+      {
+        id: "tkt-demo-1",
+        buildingId: b1Id,
+        apartmentId: null,
+        unitLabel: "Apt 4",
+        reporterName: "M. Karim Benali",
+        reporterEmail: "",
+        title: "Ampoule palier 2ème étage grillée",
+        description: "La lumière devant l'ascenseur au 2ème étage ne s'allume plus depuis hier soir.",
+        category: "electricite",
+        status: "in_progress",
+        photoUrl: null,
+        adminNote: "Intervention électricien programmée jeudi après-midi.",
+        createdAt: `${m0}-07T18:20:00.000Z`,
+        updatedAt: `${m0}-08T10:00:00.000Z`,
+      },
+    ],
+    auditLogs: [],
     myRoles: {},
   };
 }

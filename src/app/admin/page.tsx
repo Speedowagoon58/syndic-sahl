@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Eye, Lock, Moon, Sun, X } from "lucide-react";
+import { ArrowLeft, Check, Eye, Lock, Moon, ShieldAlert, Sun, X } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/context/AppContext";
 import { useAuthEnabled } from "@/components/AuthAvailability";
@@ -15,12 +15,14 @@ import {
   getPlanAccess,
 } from "@/lib/calculations";
 import { ReceiptLightbox } from "@/components/ReceiptLightbox";
+import type { Building, SubscriptionRequest } from "@/lib/types";
 
 function ClerkAdminGate({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useUser();
-  const { t, theme, toggleTheme } = useApp();
+  const { workspaceReady, cloudConnected, isFounder, t, theme, toggleTheme } =
+    useApp();
 
-  if (!isLoaded) {
+  if (!isLoaded || !workspaceReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400 dark:bg-[#09090B]">
         {t.common.loading}
@@ -65,10 +67,62 @@ function ClerkAdminGate({ children }: { children: React.ReactNode }) {
               {t.admin.protectedDesc}
             </p>
             <Link
-              href="/sign-in"
+              href="/sign-in?redirect_url=%2Fadmin"
               className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
             >
               {t.admin.signInGoogleBtn}
+            </Link>
+          </div>
+        </main>
+        <div />
+      </div>
+    );
+  }
+
+  if (cloudConnected && !isFounder) {
+    return (
+      <div className="min-h-screen flex flex-col justify-between bg-[#F6F6F4] p-4 text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100">
+        <header className="mx-auto flex w-full max-w-5xl items-center justify-between py-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {t.admin.backToApp}
+          </Link>
+          <div className="flex items-center gap-2">
+            <AuthControls variant="header" />
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+              className="rounded-lg border border-zinc-200 bg-white p-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        </header>
+
+        <main className="mx-auto w-full max-w-md py-12">
+          <div className="rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/60 dark:text-red-400">
+              <ShieldAlert className="h-4 w-4" />
+            </div>
+            <h1 className="mt-4 text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+              {t.admin.founderOnlyTitle}
+            </h1>
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              {t.admin.founderOnlyDesc}
+            </p>
+            <Link
+              href="/"
+              className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+            >
+              {t.admin.backToApp}
             </Link>
           </div>
         </main>
@@ -83,6 +137,8 @@ function ClerkAdminGate({ children }: { children: React.ReactNode }) {
 function AdminDashboardContent() {
   const {
     hydrated,
+    cloudConnected,
+    isFounder,
     data,
     locale,
     theme,
@@ -96,6 +152,35 @@ function AdminDashboardContent() {
   } = useApp();
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [globalBuildings, setGlobalBuildings] = useState<Building[] | null>(null);
+  const [globalUnitCounts, setGlobalUnitCounts] = useState<Record<string, number> | null>(null);
+  const [globalRequests, setGlobalRequests] = useState<SubscriptionRequest[] | null>(null);
+  const [forbiddenPlatform, setForbiddenPlatform] = useState(false);
+
+  useEffect(() => {
+    if (!hydrated || !cloudConnected || !isFounder) return;
+    let active = true;
+    fetch("/api/admin")
+      .then(async (res) => {
+        if (!active) return;
+        if (res.status === 403) {
+          setForbiddenPlatform(true);
+          return;
+        }
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!active || json.mode !== "neon") return;
+        setGlobalBuildings(json.buildings ?? []);
+        setGlobalUnitCounts(json.unitCounts ?? {});
+        setGlobalRequests(json.subscriptionRequests ?? []);
+      })
+      .catch(() => {
+        // Fallback to AppContext workspace state
+      });
+    return () => {
+      active = false;
+    };
+  }, [cloudConnected, hydrated, isFounder]);
 
   if (!hydrated) {
     return (
@@ -105,13 +190,121 @@ function AdminDashboardContent() {
     );
   }
 
-  const pendingRequests = data.subscriptionRequests.filter(
-    (r) => r.status === "pending"
-  );
-  const paidBuildingsCount = data.buildings.filter(
+  if (forbiddenPlatform) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-4 dark:bg-[#09090B]">
+        <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-[#111113]">
+          <ShieldAlert className="mx-auto h-6 w-6 text-red-500" />
+          <h1 className="mt-3 text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+            {t.admin.founderOnlyTitle}
+          </h1>
+          <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            {t.admin.founderOnlyDesc}
+          </p>
+          <Link
+            href="/"
+            className="mt-5 inline-flex rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-950"
+          >
+            {t.admin.backToApp}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const buildings = globalBuildings ?? data.buildings;
+  const requests = globalRequests ?? data.subscriptionRequests;
+
+  const pendingRequests = requests.filter((r) => r.status === "pending");
+  const paidBuildingsCount = buildings.filter(
     (b) => b.planStatus === "active"
   ).length;
   const estimatedArr = paidBuildingsCount * PLANS.annual.priceMAD;
+
+  const handleApprove = (req: SubscriptionRequest) => {
+    const months = PLANS[req.plan].months;
+    const expires = new Date();
+    expires.setMonth(expires.getMonth() + months);
+    const expiresIso = expires.toISOString();
+
+    adminApproveRequest(req.id);
+    if (!data.buildings.some((b) => b.id === req.buildingId)) {
+      adminActivateBuilding(req.buildingId, months);
+    }
+
+    if (globalRequests) {
+      setGlobalRequests((prev) =>
+        prev
+          ? prev.map((r) =>
+              r.id === req.id ? { ...r, status: "approved" } : r
+            )
+          : prev
+      );
+    }
+    if (globalBuildings) {
+      setGlobalBuildings((prev) =>
+        prev
+          ? prev.map((b) =>
+              b.id === req.buildingId
+                ? { ...b, planStatus: "active", planExpiresAt: expiresIso }
+                : b
+            )
+          : prev
+      );
+    }
+  };
+
+  const handleReject = (reqId: string) => {
+    adminRejectRequest(reqId);
+    if (globalRequests) {
+      setGlobalRequests((prev) =>
+        prev
+          ? prev.map((r) =>
+              r.id === reqId ? { ...r, status: "rejected" } : r
+            )
+          : prev
+      );
+    }
+  };
+
+  const handleActivateBuilding = (buildingId: string, months: number) => {
+    const expires = new Date();
+    expires.setMonth(expires.getMonth() + months);
+    const expiresIso = expires.toISOString();
+    adminActivateBuilding(buildingId, months);
+    if (globalBuildings) {
+      setGlobalBuildings((prev) =>
+        prev
+          ? prev.map((b) =>
+              b.id === buildingId
+                ? { ...b, planStatus: "active", planExpiresAt: expiresIso }
+                : b
+            )
+          : prev
+      );
+    }
+  };
+
+  const handleExpireBuilding = (buildingId: string) => {
+    const pastIso = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    adminSetBuildingExpired(buildingId);
+    if (globalBuildings) {
+      setGlobalBuildings((prev) =>
+        prev
+          ? prev.map((b) =>
+              b.id === buildingId
+                ? {
+                    ...b,
+                    planStatus: "expired",
+                    trialEndsAt: pastIso,
+                    planExpiresAt: pastIso,
+                  }
+                : b
+            )
+          : prev
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F6F6F4] pb-12 text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100">
@@ -164,7 +357,7 @@ function AdminDashboardContent() {
               {t.admin.totalBuildings}
             </span>
             <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
-              {data.buildings.length}
+              {buildings.length}
             </p>
           </div>
           <div className="p-5">
@@ -240,7 +433,7 @@ function AdminDashboardContent() {
                     )}
                     <button
                       type="button"
-                      onClick={() => adminApproveRequest(req.id)}
+                      onClick={() => handleApprove(req)}
                       className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950"
                     >
                       <Check className="h-3.5 w-3.5" />
@@ -248,7 +441,7 @@ function AdminDashboardContent() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => adminRejectRequest(req.id)}
+                      onClick={() => handleReject(req.id)}
                       className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-red-400"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -268,10 +461,12 @@ function AdminDashboardContent() {
             </h2>
           </div>
           <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {data.buildings.map((b) => {
-              const unitsCount = data.apartments.filter(
-                (a) => a.buildingId === b.id && a.active
-              ).length;
+            {buildings.map((b) => {
+              const unitsCount =
+                globalUnitCounts?.[b.id] ??
+                data.apartments.filter(
+                  (a) => a.buildingId === b.id && a.active
+                ).length;
               const access = getPlanAccess(b, unitsCount);
               const refCode = getBuildingReferenceCode(b.id);
 
@@ -320,21 +515,21 @@ function AdminDashboardContent() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => adminActivateBuilding(b.id, 12)}
+                      onClick={() => handleActivateBuilding(b.id, 12)}
                       className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950"
                     >
                       {t.admin.activateYear}
                     </button>
                     <button
                       type="button"
-                      onClick={() => adminActivateBuilding(b.id, 6)}
+                      onClick={() => handleActivateBuilding(b.id, 6)}
                       className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
                     >
                       {t.admin.activateSixMonths}
                     </button>
                     <button
                       type="button"
-                      onClick={() => adminSetBuildingExpired(b.id)}
+                      onClick={() => handleExpireBuilding(b.id)}
                       className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-red-400"
                     >
                       {t.admin.markExpired}

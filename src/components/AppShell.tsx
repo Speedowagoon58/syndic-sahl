@@ -7,6 +7,7 @@ import {
   CreditCard,
   FileBarChart2,
   Link2,
+  Megaphone,
   Moon,
   Plus,
   Receipt,
@@ -33,9 +34,11 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
     theme,
     toggleTheme,
     cloudConnected,
+    isFounder,
     data,
     activeBuilding,
     activeBuildingRole,
+    openTicketsCount,
     setActiveBuildingId,
     activeTab,
     setActiveTab,
@@ -47,9 +50,16 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
     id: AppTab;
     label: string;
     icon: React.ComponentType<{ className?: string }>;
+    badgeCount?: number;
   }[] = [
     { id: "payments", label: t.nav.payments, icon: Wallet },
     { id: "expenses", label: t.nav.expenses, icon: Receipt },
+    {
+      id: "community",
+      label: t.nav.community,
+      icon: Megaphone,
+      badgeCount: openTicketsCount,
+    },
     { id: "report", label: t.nav.report, icon: FileBarChart2 },
     { id: "subscription", label: t.nav.subscription, icon: CreditCard },
     { id: "settings", label: t.nav.settings, icon: Settings },
@@ -181,7 +191,18 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                       : "text-zinc-400 dark:text-zinc-500"
                   }`}
                 />
-                <span>{item.label}</span>
+                <span className="flex-1 text-start">{item.label}</span>
+                {item.badgeCount && item.badgeCount > 0 ? (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 tabular-nums text-[10px] font-semibold ${
+                      isActive
+                        ? "bg-white/20 text-white dark:bg-zinc-900/20 dark:text-zinc-950"
+                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    }`}
+                  >
+                    {item.badgeCount}
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -265,12 +286,14 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
             >
               {t.header.loginLink}
             </Link>
-            <Link
-              href="/admin"
-              className="font-medium hover:text-zinc-800 dark:hover:text-zinc-200"
-            >
-              {t.header.adminLink}
-            </Link>
+            {(isFounder || !cloudConnected) && (
+              <Link
+                href="/admin"
+                className="font-medium hover:text-zinc-800 dark:hover:text-zinc-200"
+              >
+                {t.header.adminLink}
+              </Link>
+            )}
           </div>
         </div>
       </aside>
@@ -405,8 +428,8 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 px-2 py-1 backdrop-blur-md dark:border-zinc-800 dark:bg-[#111113]/95 lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+      <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 px-1.5 py-1 backdrop-blur-md dark:border-zinc-800 dark:bg-[#111113]/95 lg:hidden">
+        <div className="mx-auto grid max-w-lg grid-cols-6 gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -415,7 +438,7 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`flex flex-col items-center justify-center rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                className={`relative flex flex-col items-center justify-center rounded-lg py-1.5 text-[10px] font-medium transition-colors ${
                   isActive
                     ? "text-zinc-950 font-semibold dark:text-zinc-100"
                     : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
@@ -428,7 +451,10 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                       : "text-zinc-400 dark:text-zinc-500"
                   }`}
                 />
-                <span className="mt-0.5 truncate max-w-full px-1">
+                {item.badgeCount && item.badgeCount > 0 ? (
+                  <span className="absolute top-1 end-2 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                ) : null}
+                <span className="mt-0.5 truncate max-w-full px-0.5">
                   {item.label}
                 </span>
               </button>

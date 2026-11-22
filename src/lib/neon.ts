@@ -131,12 +131,61 @@ export async function ensureNeonSchema(): Promise<void> {
         )
       `;
 
+      await sql`
+        create table if not exists syndic_audit_logs (
+          id text primary key,
+          building_id text not null references syndic_buildings(id) on delete cascade,
+          actor_user_id text,
+          actor_name text not null default '',
+          actor_email text not null default '',
+          actor_role text not null default 'syndic',
+          action text not null,
+          summary text not null,
+          created_at timestamptz not null default now()
+        )
+      `;
+
+      await sql`
+        create table if not exists syndic_announcements (
+          id text primary key,
+          building_id text not null references syndic_buildings(id) on delete cascade,
+          title text not null,
+          body text not null,
+          category text not null default 'info',
+          pinned boolean not null default false,
+          author_name text not null default '',
+          created_at timestamptz not null default now()
+        )
+      `;
+
+      await sql`
+        create table if not exists syndic_tickets (
+          id text primary key,
+          building_id text not null references syndic_buildings(id) on delete cascade,
+          apartment_id text references syndic_apartments(id) on delete set null,
+          unit_label text not null default '',
+          reporter_name text not null default '',
+          reporter_email text not null default '',
+          title text not null,
+          description text not null,
+          category text not null default 'autre',
+          status text not null default 'open',
+          photo_url text,
+          admin_note text not null default '',
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now()
+        )
+      `;
+
       await sql`create index if not exists idx_syndic_apt_building on syndic_apartments(building_id, sort_order)`;
       await sql`create index if not exists idx_syndic_pay_building on syndic_payments(building_id, month_key)`;
       await sql`create index if not exists idx_syndic_exp_building on syndic_expenses(building_id, expense_date desc)`;
       await sql`create index if not exists idx_syndic_members_building on syndic_memberships(building_id)`;
       await sql`create index if not exists idx_syndic_members_email on syndic_memberships(lower(email))`;
       await sql`create index if not exists idx_syndic_members_user on syndic_memberships(clerk_user_id)`;
+      await sql`create index if not exists idx_syndic_audit_building on syndic_audit_logs(building_id, created_at desc)`;
+      await sql`create index if not exists idx_syndic_ann_building on syndic_announcements(building_id, pinned desc, created_at desc)`;
+      await sql`create index if not exists idx_syndic_tkt_building on syndic_tickets(building_id, created_at desc)`;
 
       // Auto-seed realistic Moroccan demo data if database is brand new
       const countRows = await sql`select count(*)::int as cnt from syndic_buildings`;
@@ -213,6 +262,31 @@ export async function seedNeonDatabase(
       ) values (
         ${r.id}, ${r.buildingId}, ${r.buildingName}, ${r.referenceCode}, ${r.plan},
         ${r.amountMAD}, ${r.channel}, ${r.proofPhotoUrl}, ${r.note}, ${r.status}, ${r.createdAt}
+      ) on conflict (id) do nothing
+    `;
+  }
+
+  for (const ann of seed.announcements) {
+    await sql`
+      insert into syndic_announcements (
+        id, building_id, title, body, category, pinned, author_name, created_at
+      ) values (
+        ${ann.id}, ${ann.buildingId}, ${ann.title}, ${ann.body}, ${ann.category},
+        ${ann.pinned}, ${ann.authorName}, ${ann.createdAt}
+      ) on conflict (id) do nothing
+    `;
+  }
+
+  for (const tkt of seed.tickets) {
+    await sql`
+      insert into syndic_tickets (
+        id, building_id, apartment_id, unit_label, reporter_name, reporter_email,
+        title, description, category, status, photo_url, admin_note, created_at, updated_at
+      ) values (
+        ${tkt.id}, ${tkt.buildingId}, ${tkt.apartmentId}, ${tkt.unitLabel},
+        ${tkt.reporterName}, ${tkt.reporterEmail}, ${tkt.title}, ${tkt.description},
+        ${tkt.category}, ${tkt.status}, ${tkt.photoUrl}, ${tkt.adminNote},
+        ${tkt.createdAt}, ${tkt.updatedAt}
       ) on conflict (id) do nothing
     `;
   }

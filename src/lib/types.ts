@@ -16,7 +16,22 @@ export type SubscriptionChannel = "virement" | "cashplus";
 export type SubscriptionRequestStatus = "pending" | "approved" | "rejected";
 export type MemberRole = "syndic" | "assistant" | "tenant";
 export type MemberStatus = "invited" | "active" | "revoked";
-export type AppTab = "payments" | "expenses" | "report" | "subscription" | "settings";
+export type AnnouncementCategory = "info" | "ag" | "travaux" | "urgence";
+export type TicketCategory =
+  | "plomberie"
+  | "electricite"
+  | "ascenseur"
+  | "nettoyage"
+  | "securite"
+  | "autre";
+export type TicketStatus = "open" | "in_progress" | "resolved";
+export type AppTab =
+  | "payments"
+  | "expenses"
+  | "community"
+  | "report"
+  | "subscription"
+  | "settings";
 
 export interface Building {
   id: string;
@@ -99,6 +114,46 @@ export interface BuildingMembership {
   acceptedAt: string | null;
 }
 
+export interface BuildingAnnouncement {
+  id: string;
+  buildingId: string;
+  title: string;
+  body: string;
+  category: AnnouncementCategory;
+  pinned: boolean;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface MaintenanceTicket {
+  id: string;
+  buildingId: string;
+  apartmentId: string | null;
+  unitLabel: string;
+  reporterName: string;
+  reporterEmail: string;
+  title: string;
+  description: string;
+  category: TicketCategory;
+  status: TicketStatus;
+  photoUrl: string | null;
+  adminNote: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  buildingId: string;
+  actorUserId: string | null;
+  actorName: string;
+  actorEmail: string;
+  actorRole: MemberRole;
+  action: string;
+  summary: string;
+  createdAt: string;
+}
+
 export interface AppData {
   locale: Locale;
   theme: ThemeMode;
@@ -110,5 +165,8 @@ export interface AppData {
   expenses: Expense[];
   subscriptionRequests: SubscriptionRequest[];
   memberships: BuildingMembership[];
+  announcements: BuildingAnnouncement[];
+  tickets: MaintenanceTicket[];
+  auditLogs: AuditLogEntry[];
   myRoles: Record<string, MemberRole>;
 }

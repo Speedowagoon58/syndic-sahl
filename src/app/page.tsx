@@ -6,6 +6,7 @@ import { ArrowRight, Building2, Lock, Moon, Plus, Sun } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { AppShell } from "@/components/AppShell";
 import { AuthControls } from "@/components/AuthControls";
+import { CommunityTab } from "@/components/CommunityTab";
 import { ExpensesTab } from "@/components/ExpensesTab";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { PaymentsTab } from "@/components/PaymentsTab";
@@ -273,6 +274,7 @@ export default function HomePage() {
       <AppShell onOpenOnboarding={() => setOnboardingOpen(true)}>
         {activeTab === "payments" && <PaymentsTab />}
         {activeTab === "expenses" && <ExpensesTab />}
+        {activeTab === "community" && <CommunityTab />}
         {activeTab === "report" && <ReportTab />}
         {activeTab === "subscription" && <SubscriptionTab />}
         {activeTab === "settings" && <SettingsTab />}

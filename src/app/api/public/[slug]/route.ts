@@ -14,12 +14,14 @@ import { ensureNeonSchema, getSql } from "@/lib/neon";
 async function buildSafePortalResponse(
   sql: NeonQueryFunction<false, false>,
   building: Record<string, unknown>,
-  viewer?: UserMembershipMatch | null
+  viewer?: UserMembershipMatch | null,
+  viewerEmails: string[] = []
 ) {
   const buildingId = String(building.id);
   const showNames = Boolean(building.show_names_publicly);
+  const viewerEmailSet = new Set(viewerEmails.map((e) => e.trim().toLowerCase()));
 
-  const [aRows, pRows, eRows] = await Promise.all([
+  const [aRows, pRows, eRows, annRows, tktRows] = await Promise.all([
     sql`
       select id, building_id, unit_label, resident_name, monthly_fee, billing_cycle, active, sort_order
       from syndic_apartments
@@ -36,6 +38,21 @@ async function buildSafePortalResponse(
       from syndic_expenses
       where building_id = ${buildingId}
       order by expense_date desc, created_at desc
+    `,
+    sql`
+      select id, building_id, title, body, category, pinned, author_name, created_at
+      from syndic_announcements
+      where building_id = ${buildingId}
+      order by pinned desc, created_at desc
+      limit 30
+    `,
+    sql`
+      select id, building_id, apartment_id, unit_label, reporter_name, reporter_email,
+             title, description, category, status, photo_url, admin_note, created_at, updated_at
+      from syndic_tickets
+      where building_id = ${buildingId}
+      order by created_at desc
+      limit 50
     `,
   ]);
 
@@ -75,6 +92,38 @@ async function buildSafePortalResponse(
     createdAt: new Date(String(e.created_at)).toISOString(),
   }));
 
+  const safeAnnouncements = annRows.map((ann) => ({
+    id: String(ann.id),
+    buildingId: String(ann.building_id),
+    title: String(ann.title),
+    body: String(ann.body),
+    category: String(ann.category ?? "info"),
+    pinned: Boolean(ann.pinned),
+    authorName: String(ann.author_name ?? ""),
+    createdAt: new Date(String(ann.created_at)).toISOString(),
+  }));
+
+  const safeTickets = tktRows.map((tkt) => {
+    const rowEmail = String(tkt.reporter_email ?? "").trim().toLowerCase();
+    const isOwn = Boolean(rowEmail && viewerEmailSet.has(rowEmail));
+    return {
+      id: String(tkt.id),
+      buildingId: String(tkt.building_id),
+      apartmentId: tkt.apartment_id ? String(tkt.apartment_id) : null,
+      unitLabel: String(tkt.unit_label ?? ""),
+      reporterName: showNames || isOwn ? String(tkt.reporter_name ?? "") : "",
+      reporterEmail: "",
+      title: String(tkt.title),
+      description: String(tkt.description ?? ""),
+      category: String(tkt.category ?? "autre"),
+      status: String(tkt.status ?? "open"),
+      photoUrl: tkt.photo_url ? String(tkt.photo_url) : null,
+      adminNote: String(tkt.admin_note ?? ""),
+      createdAt: new Date(String(tkt.created_at)).toISOString(),
+      updatedAt: new Date(String(tkt.updated_at)).toISOString(),
+    };
+  });
+
   return NextResponse.json({
     mode: "cloud",
     requiresAuth: false,
@@ -103,6 +152,8 @@ async function buildSafePortalResponse(
     apartments: safeApartments,
     payments: safePayments,
     expenses: safeExpenses,
+    announcements: safeAnnouncements,
+    tickets: safeTickets,
   });
 }
 
@@ -166,7 +217,8 @@ export async function GET(
       return buildSafePortalResponse(
         sql,
         building as Record<string, unknown>,
-        membership
+        membership,
+        identity.emails
       );
     }
 
@@ -260,7 +312,8 @@ export async function POST(
       return buildSafePortalResponse(
         sql,
         building as Record<string, unknown>,
-        membership
+        membership,
+        identity.emails
       );
     }
 

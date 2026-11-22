@@ -35,6 +35,11 @@ export function loadAppData(): AppData {
         ? parsed.subscriptionRequests
         : [],
       memberships: Array.isArray(parsed.memberships) ? parsed.memberships : [],
+      announcements: Array.isArray(parsed.announcements)
+        ? parsed.announcements
+        : [],
+      tickets: Array.isArray(parsed.tickets) ? parsed.tickets : [],
+      auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
       myRoles:
         parsed.myRoles && typeof parsed.myRoles === "object"
           ? parsed.myRoles

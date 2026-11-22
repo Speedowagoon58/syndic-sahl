@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Camera,
+  Download,
   Eye,
   Plus,
   Receipt,
@@ -16,6 +17,7 @@ import {
   formatDateShort,
   formatMAD,
 } from "@/lib/calculations";
+import { exportExpensesCsv } from "@/lib/export-csv";
 import { compressImageToDataUrl } from "@/lib/image";
 import { ReceiptLightbox } from "@/components/ReceiptLightbox";
 import type { ExpenseCategory } from "@/lib/types";
@@ -119,14 +121,26 @@ export function ExpensesTab() {
             {t.expenses.subtitle}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-xs font-medium text-white shadow-2xs hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <span>{t.expenses.addExpense}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              exportExpensesCsv(activeBuilding, buildingExpenses, locale)
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <Download className="h-3.5 w-3.5 text-zinc-400" />
+            <span>{t.expenses.exportCsv}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-xs font-medium text-white shadow-2xs hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>{t.expenses.addExpense}</span>
+          </button>
+        </div>
       </div>
 
       {/* Unified Spend Summary & Stacked Distribution Bar */}

@@ -21,6 +21,24 @@ export function isClerkServerConfigured(): boolean {
   );
 }
 
+const DEFAULT_FOUNDER_EMAIL = "mohammedboulahouajeb@gmail.com";
+
+export function getFounderEmails(): string[] {
+  const raw = process.env.ADMIN_EMAIL || DEFAULT_FOUNDER_EMAIL;
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isFounderIdentity(
+  identity: AuthenticatedClerkIdentity | null
+): boolean {
+  if (!identity) return false;
+  const founderSet = new Set(getFounderEmails());
+  return identity.emails.some((email) => founderSet.has(email));
+}
+
 /**
  * Resolves the signed-in Clerk identity and verified/listed lowercased emails.
  * Returns null when unauthenticated or when Clerk is not configured.

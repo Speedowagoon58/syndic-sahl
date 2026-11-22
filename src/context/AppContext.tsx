@@ -27,15 +27,19 @@ import {
   saveAppData,
 } from "@/lib/storage";
 import type {
+  AnnouncementCategory,
   Apartment,
   AppData,
   AppTab,
+  AuditLogEntry,
   BillingCycle,
   Building,
+  BuildingAnnouncement,
   BuildingMembership,
   Expense,
   ExpenseCategory,
   Locale,
+  MaintenanceTicket,
   MemberRole,
   Payment,
   PaymentMethod,
@@ -43,6 +47,8 @@ import type {
   SubscriptionChannel,
   SubscriptionRequest,
   ThemeMode,
+  TicketCategory,
+  TicketStatus,
   WhatsAppLang,
 } from "@/lib/types";
 
@@ -104,6 +110,7 @@ interface AppContextValue {
   workspaceReady: boolean;
   authRequired: boolean;
   cloudConnected: boolean;
+  isFounder: boolean;
   data: AppData;
   t: TranslationDict;
   locale: Locale;
@@ -118,6 +125,10 @@ interface AppContextValue {
   buildingPayments: Payment[];
   buildingExpenses: Expense[];
   buildingMemberships: BuildingMembership[];
+  buildingAnnouncements: BuildingAnnouncement[];
+  buildingTickets: MaintenanceTicket[];
+  buildingAuditLogs: AuditLogEntry[];
+  openTicketsCount: number;
   planAccess: PlanAccessInfo;
   toast: string | null;
   setActiveTab: (tab: AppTab) => void;
@@ -127,6 +138,7 @@ interface AppContextValue {
   setWhatsappLang: (lang: WhatsAppLang) => void;
   setActiveBuildingId: (buildingId: string) => void;
   showToast: (message: string) => void;
+  refreshWorkspace: () => Promise<void>;
   createBuilding: (input: CreateBuildingInput) => Building;
   deleteBuilding: (buildingId: string) => boolean;
   updateBuildingSettings: (
@@ -223,6 +235,28 @@ interface AppContextValue {
     apartmentId?: string | null;
   }) => Promise<boolean>;
   revokeMember: (membershipId: string) => Promise<boolean>;
+  transferOwnership: (buildingId: string, targetMembershipId: string) => Promise<boolean>;
+  createAnnouncement: (input: {
+    title: string;
+    body: string;
+    category: AnnouncementCategory;
+    pinned: boolean;
+  }) => Promise<boolean>;
+  toggleAnnouncementPin: (announcementId: string) => void;
+  deleteAnnouncement: (announcementId: string) => void;
+  createTicket: (input: {
+    title: string;
+    description: string;
+    category: TicketCategory;
+    unitLabel?: string;
+    photoUrl?: string | null;
+  }) => Promise<boolean>;
+  updateTicketStatus: (input: {
+    ticketId: string;
+    status: TicketStatus;
+    adminNote: string;
+  }) => Promise<boolean>;
+  deleteTicket: (ticketId: string) => void;
   resetDemoData: () => void;
 }
 
@@ -237,6 +271,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [data, setData] = useState<AppData>(() => loadAppData());
   const [cloudConnected, setCloudConnected] = useState(false);
+  const [isFounder, setIsFounder] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>("payments");
@@ -255,6 +290,72 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setToast(null);
     }, 3600);
   }, []);
+
+  const applyRemoteWorkspace = useCallback((remote: Record<string, unknown>) => {
+    if (remote.mode === "auth_required") {
+      setAuthRequired(true);
+      setCloudConnected(false);
+      setIsFounder(false);
+      setData((prev) => ({
+        ...prev,
+        activeBuildingId: "",
+        buildings: [],
+        apartments: [],
+        payments: [],
+        expenses: [],
+        subscriptionRequests: [],
+        memberships: [],
+        announcements: [],
+        tickets: [],
+        auditLogs: [],
+        myRoles: {},
+      }));
+      return;
+    }
+    if (remote.mode !== "neon" || !Array.isArray(remote.buildings)) {
+      return;
+    }
+    setAuthRequired(false);
+    setCloudConnected(true);
+    setIsFounder(Boolean(remote.isFounder));
+    setData((prev) => {
+      const remoteBuildings = remote.buildings as Building[];
+      const validActive = remoteBuildings.some(
+        (b) => b.id === prev.activeBuildingId
+      )
+        ? prev.activeBuildingId
+        : remoteBuildings[0]?.id ?? "";
+      return {
+        ...prev,
+        activeBuildingId: validActive,
+        buildings: remoteBuildings,
+        apartments: (remote.apartments as Apartment[]) ?? [],
+        payments: (remote.payments as Payment[]) ?? [],
+        expenses: (remote.expenses as Expense[]) ?? [],
+        subscriptionRequests:
+          (remote.subscriptionRequests as SubscriptionRequest[]) ?? [],
+        memberships: (remote.memberships as BuildingMembership[]) ?? [],
+        announcements:
+          (remote.announcements as BuildingAnnouncement[]) ?? [],
+        tickets: (remote.tickets as MaintenanceTicket[]) ?? [],
+        auditLogs: (remote.auditLogs as AuditLogEntry[]) ?? [],
+        myRoles: (remote.myRoles as Record<string, MemberRole>) ?? {},
+      };
+    });
+  }, []);
+
+  const refreshWorkspace = useCallback(async () => {
+    try {
+      const res = await fetch("/api/workspace");
+      if (!res.ok) return;
+      const remote = (await res.json()) as Record<string, unknown>;
+      if (remote) {
+        applyRemoteWorkspace(remote);
+      }
+    } catch {
+      // Ignore network errors silently during background refresh
+    }
+  }, [applyRemoteWorkspace]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -277,52 +378,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetch("/api/workspace")
       .then((res) => (res.ok ? res.json() : null))
       .then((remote) => {
-        if (!active || !remote) {
-          if (active) setWorkspaceReady(true);
-          return;
+        if (!active) return;
+        if (remote) {
+          applyRemoteWorkspace(remote as Record<string, unknown>);
         }
-        if (remote.mode === "auth_required") {
-          setAuthRequired(true);
-          setCloudConnected(false);
-          setData((prev) => ({
-            ...prev,
-            activeBuildingId: "",
-            buildings: [],
-            apartments: [],
-            payments: [],
-            expenses: [],
-            subscriptionRequests: [],
-            memberships: [],
-            myRoles: {},
-          }));
-          setWorkspaceReady(true);
-          return;
-        }
-        if (remote.mode !== "neon" || !Array.isArray(remote.buildings)) {
-          setWorkspaceReady(true);
-          return;
-        }
-        setAuthRequired(false);
-        setCloudConnected(true);
-        setData((prev) => {
-          const remoteBuildings = remote.buildings as Building[];
-          const validActive = remoteBuildings.some(
-            (b) => b.id === prev.activeBuildingId
-          )
-            ? prev.activeBuildingId
-            : remoteBuildings[0]?.id ?? "";
-          return {
-            ...prev,
-            activeBuildingId: validActive,
-            buildings: remoteBuildings,
-            apartments: remote.apartments ?? [],
-            payments: remote.payments ?? [],
-            expenses: remote.expenses ?? [],
-            subscriptionRequests: remote.subscriptionRequests ?? [],
-            memberships: remote.memberships ?? [],
-            myRoles: remote.myRoles ?? {},
-          };
-        });
         setWorkspaceReady(true);
       })
       .catch(() => {
@@ -332,7 +391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [hydrated]);
+  }, [applyRemoteWorkspace, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -385,6 +444,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       (m) => m.buildingId === activeBuilding.id && m.status !== "revoked"
     );
   }, [data.memberships, activeBuilding.id, hasBuildings]);
+
+  const buildingAnnouncements = useMemo(() => {
+    if (!hasBuildings || !activeBuilding.id) return [];
+    return (data.announcements ?? [])
+      .filter((a) => a.buildingId === activeBuilding.id)
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+  }, [data.announcements, activeBuilding.id, hasBuildings]);
+
+  const buildingTickets = useMemo(() => {
+    if (!hasBuildings || !activeBuilding.id) return [];
+    return (data.tickets ?? [])
+      .filter((tkt) => tkt.buildingId === activeBuilding.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [data.tickets, activeBuilding.id, hasBuildings]);
+
+  const buildingAuditLogs = useMemo(() => {
+    if (!hasBuildings || !activeBuilding.id) return [];
+    return (data.auditLogs ?? [])
+      .filter((log) => log.buildingId === activeBuilding.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [data.auditLogs, activeBuilding.id, hasBuildings]);
+
+  const openTicketsCount = useMemo(
+    () => buildingTickets.filter((tkt) => tkt.status !== "resolved").length,
+    [buildingTickets]
+  );
+
+  const effectiveIsFounder = cloudConnected ? isFounder : true;
 
   const activeUnitsCount = useMemo(
     () => buildingApartments.filter((a) => a.active).length,
@@ -520,6 +610,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ),
           memberships: (prev.memberships ?? []).filter(
             (m) => m.buildingId !== buildingId
+          ),
+          announcements: (prev.announcements ?? []).filter(
+            (a) => a.buildingId !== buildingId
+          ),
+          tickets: (prev.tickets ?? []).filter(
+            (tkt) => tkt.buildingId !== buildingId
+          ),
+          auditLogs: (prev.auditLogs ?? []).filter(
+            (aud) => aud.buildingId !== buildingId
           ),
           myRoles: nextRoles,
         };
@@ -934,19 +1033,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
-      if (target) {
-        syncWorkspaceAction(
-          "update_building",
-          {
-            building: {
-              ...target,
-              planStatus: "active",
-              planExpiresAt: expiresIso,
-            },
-          },
-          handleSyncError
-        );
-      }
+      syncWorkspaceAction(
+        "admin_update_building_plan",
+        {
+          buildingId,
+          planStatus: "active",
+          trialEndsAt: target?.trialEndsAt ?? new Date().toISOString(),
+          planExpiresAt: expiresIso,
+        },
+        handleSyncError
+      );
       showToast(t.common.saved);
     },
     [data.buildings, handleSyncError, showToast, t.common.saved]
@@ -955,7 +1051,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const adminApproveRequest = useCallback(
     (requestId: string) => {
       const target = data.subscriptionRequests.find((r) => r.id === requestId);
-      if (!target) return;
+      if (!target) {
+        syncWorkspaceAction(
+          "update_subscription_request",
+          { requestId, status: "approved" },
+          handleSyncError
+        );
+        showToast(t.common.saved);
+        return;
+      }
       const months = PLANS[target.plan].months;
       const expires = new Date();
       expires.setMonth(expires.getMonth() + months);
@@ -980,19 +1084,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { requestId, status: "approved" },
         handleSyncError
       );
-      if (targetBuilding) {
-        syncWorkspaceAction(
-          "update_building",
-          {
-            building: {
-              ...targetBuilding,
-              planStatus: "active",
-              planExpiresAt: expiresIso,
-            },
-          },
-          handleSyncError
-        );
-      }
+      syncWorkspaceAction(
+        "admin_update_building_plan",
+        {
+          buildingId: target.buildingId,
+          planStatus: "active",
+          trialEndsAt: targetBuilding?.trialEndsAt ?? new Date().toISOString(),
+          planExpiresAt: expiresIso,
+        },
+        handleSyncError
+      );
       showToast(t.common.saved);
     },
     [data.buildings, data.subscriptionRequests, handleSyncError, showToast, t.common.saved]
@@ -1019,7 +1120,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const adminSetBuildingExpired = useCallback(
     (buildingId: string) => {
       const pastIso = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-      const target = data.buildings.find((b) => b.id === buildingId);
       setData((prev) => ({
         ...prev,
         buildings: prev.buildings.map((b) =>
@@ -1033,23 +1133,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
-      if (target) {
-        syncWorkspaceAction(
-          "update_building",
-          {
-            building: {
-              ...target,
-              planStatus: "expired",
-              trialEndsAt: pastIso,
-              planExpiresAt: pastIso,
-            },
-          },
-          handleSyncError
-        );
-      }
+      syncWorkspaceAction(
+        "admin_update_building_plan",
+        {
+          buildingId,
+          planStatus: "expired",
+          trialEndsAt: pastIso,
+          planExpiresAt: pastIso,
+        },
+        handleSyncError
+      );
       showToast(t.common.saved);
     },
-    [data.buildings, handleSyncError, showToast, t.common.saved]
+    [handleSyncError, showToast, t.common.saved]
   );
 
   const adminRestoreBuildingTrial = useCallback(
@@ -1057,7 +1153,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const futureIso = new Date(
         Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000
       ).toISOString();
-      const target = data.buildings.find((b) => b.id === buildingId);
       setData((prev) => ({
         ...prev,
         buildings: prev.buildings.map((b) =>
@@ -1071,23 +1166,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
-      if (target) {
-        syncWorkspaceAction(
-          "update_building",
-          {
-            building: {
-              ...target,
-              planStatus: "trial",
-              trialEndsAt: futureIso,
-              planExpiresAt: null,
-            },
-          },
-          handleSyncError
-        );
-      }
+      syncWorkspaceAction(
+        "admin_update_building_plan",
+        {
+          buildingId,
+          planStatus: "trial",
+          trialEndsAt: futureIso,
+          planExpiresAt: null,
+        },
+        handleSyncError
+      );
       showToast(t.common.saved);
     },
-    [data.buildings, handleSyncError, showToast, t.common.saved]
+    [handleSyncError, showToast, t.common.saved]
   );
 
   const inviteMember = useCallback(
@@ -1252,6 +1343,272 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
+  const transferOwnership = useCallback(
+    async (buildingId: string, targetMembershipId: string): Promise<boolean> => {
+      if (!guardWritable()) return false;
+      try {
+        if (cloudConnected) {
+          const res = await fetch("/api/workspace", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "transfer_ownership",
+              payload: { buildingId, targetMembershipId },
+            }),
+          });
+          const json = await res.json();
+          if (!res.ok) {
+            showToast(json?.message || t.common.syncErrorToast);
+            return false;
+          }
+          await refreshWorkspace();
+          showToast(t.settings.transferSyndicSuccess);
+          return true;
+        }
+      } catch {
+        showToast(t.common.syncErrorToast);
+        return false;
+      }
+
+      setData((prev) => ({
+        ...prev,
+        memberships: (prev.memberships ?? []).map((m) =>
+          m.buildingId !== buildingId
+            ? m
+            : m.id === targetMembershipId
+            ? { ...m, role: "syndic" }
+            : m.role === "syndic"
+            ? { ...m, role: "assistant" }
+            : m
+        ),
+        myRoles: {
+          ...(prev.myRoles ?? {}),
+          [buildingId]: "assistant",
+        },
+      }));
+      showToast(t.settings.transferSyndicSuccess);
+      return true;
+    },
+    [cloudConnected, guardWritable, refreshWorkspace, showToast, t.common.syncErrorToast, t.settings.transferSyndicSuccess]
+  );
+
+  const createAnnouncement = useCallback(
+    async (input: {
+      title: string;
+      body: string;
+      category: AnnouncementCategory;
+      pinned: boolean;
+    }): Promise<boolean> => {
+      if (!guardWritable()) return false;
+      const nowIso = new Date().toISOString();
+      const ann: BuildingAnnouncement = {
+        id: createId("ann"),
+        buildingId: activeBuilding.id,
+        title: input.title.trim(),
+        body: input.body.trim(),
+        category: input.category,
+        pinned: input.pinned,
+        authorName: "Syndic",
+        createdAt: nowIso,
+      };
+      if (!ann.title || !ann.body) return false;
+
+      if (cloudConnected) {
+        try {
+          const res = await fetch("/api/workspace", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "create_announcement", payload: ann }),
+          });
+          const json = await res.json();
+          if (!res.ok) {
+            showToast(json?.message || t.common.syncErrorToast);
+            return false;
+          }
+          const created = (json.announcement as BuildingAnnouncement) || ann;
+          setData((prev) => ({
+            ...prev,
+            announcements: [created, ...(prev.announcements ?? [])],
+          }));
+          showToast(t.common.saved);
+          return true;
+        } catch {
+          showToast(t.common.syncErrorToast);
+          return false;
+        }
+      }
+
+      setData((prev) => ({
+        ...prev,
+        announcements: [ann, ...(prev.announcements ?? [])],
+      }));
+      showToast(t.common.saved);
+      return true;
+    },
+    [activeBuilding.id, cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+  );
+
+  const toggleAnnouncementPin = useCallback(
+    (announcementId: string) => {
+      if (!guardWritable()) return;
+      setData((prev) => ({
+        ...prev,
+        announcements: (prev.announcements ?? []).map((a) =>
+          a.id === announcementId ? { ...a, pinned: !a.pinned } : a
+        ),
+      }));
+      syncWorkspaceAction(
+        "toggle_announcement_pin",
+        { announcementId },
+        handleSyncError
+      );
+      showToast(t.common.saved);
+    },
+    [guardWritable, handleSyncError, showToast, t.common.saved]
+  );
+
+  const deleteAnnouncement = useCallback(
+    (announcementId: string) => {
+      if (!guardWritable()) return;
+      setData((prev) => ({
+        ...prev,
+        announcements: (prev.announcements ?? []).filter(
+          (a) => a.id !== announcementId
+        ),
+      }));
+      syncWorkspaceAction(
+        "delete_announcement",
+        { announcementId },
+        handleSyncError
+      );
+      showToast(t.common.saved);
+    },
+    [guardWritable, handleSyncError, showToast, t.common.saved]
+  );
+
+  const createTicket = useCallback(
+    async (input: {
+      title: string;
+      description: string;
+      category: TicketCategory;
+      unitLabel?: string;
+      photoUrl?: string | null;
+    }): Promise<boolean> => {
+      if (!hasBuildings || !activeBuilding.id) return false;
+      const nowIso = new Date().toISOString();
+      const ticket: MaintenanceTicket = {
+        id: createId("tkt"),
+        buildingId: activeBuilding.id,
+        apartmentId: null,
+        unitLabel: input.unitLabel?.trim() ?? "",
+        reporterName: "Syndic",
+        reporterEmail: "",
+        title: input.title.trim(),
+        description: input.description.trim(),
+        category: input.category,
+        status: "open",
+        photoUrl: input.photoUrl ?? null,
+        adminNote: "",
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      if (!ticket.title) return false;
+
+      if (cloudConnected) {
+        try {
+          const res = await fetch("/api/workspace", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "create_ticket", payload: ticket }),
+          });
+          const json = await res.json();
+          if (!res.ok) {
+            showToast(json?.message || t.common.syncErrorToast);
+            return false;
+          }
+          const created = (json.ticket as MaintenanceTicket) || ticket;
+          setData((prev) => ({
+            ...prev,
+            tickets: [created, ...(prev.tickets ?? [])],
+          }));
+          showToast(t.common.saved);
+          return true;
+        } catch {
+          showToast(t.common.syncErrorToast);
+          return false;
+        }
+      }
+
+      setData((prev) => ({
+        ...prev,
+        tickets: [ticket, ...(prev.tickets ?? [])],
+      }));
+      showToast(t.common.saved);
+      return true;
+    },
+    [activeBuilding.id, cloudConnected, hasBuildings, showToast, t.common.saved, t.common.syncErrorToast]
+  );
+
+  const updateTicketStatus = useCallback(
+    async (input: {
+      ticketId: string;
+      status: TicketStatus;
+      adminNote: string;
+    }): Promise<boolean> => {
+      if (!guardWritable()) return false;
+      const nowIso = new Date().toISOString();
+      if (cloudConnected) {
+        try {
+          const res = await fetch("/api/workspace", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "update_ticket_status",
+              payload: input,
+            }),
+          });
+          if (!res.ok) {
+            showToast(t.common.syncErrorToast);
+            return false;
+          }
+        } catch {
+          showToast(t.common.syncErrorToast);
+          return false;
+        }
+      }
+
+      setData((prev) => ({
+        ...prev,
+        tickets: (prev.tickets ?? []).map((tkt) =>
+          tkt.id === input.ticketId
+            ? {
+                ...tkt,
+                status: input.status,
+                adminNote: input.adminNote.trim(),
+                updatedAt: nowIso,
+              }
+            : tkt
+        ),
+      }));
+      showToast(t.common.saved);
+      return true;
+    },
+    [cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+  );
+
+  const deleteTicket = useCallback(
+    (ticketId: string) => {
+      if (!guardWritable()) return;
+      setData((prev) => ({
+        ...prev,
+        tickets: (prev.tickets ?? []).filter((tkt) => tkt.id !== ticketId),
+      }));
+      syncWorkspaceAction("delete_ticket", { ticketId }, handleSyncError);
+      showToast(t.common.saved);
+    },
+    [guardWritable, handleSyncError, showToast, t.common.saved]
+  );
+
   const resetDemoData = useCallback(() => {
     const fresh = resetDemoAppData();
     setData(fresh);
@@ -1266,6 +1623,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       workspaceReady,
       authRequired,
       cloudConnected,
+      isFounder: effectiveIsFounder,
       data,
       t,
       locale: data.locale,
@@ -1280,6 +1638,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       buildingPayments,
       buildingExpenses,
       buildingMemberships,
+      buildingAnnouncements,
+      buildingTickets,
+      buildingAuditLogs,
+      openTicketsCount,
       planAccess,
       toast,
       setActiveTab,
@@ -1289,6 +1651,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setWhatsappLang,
       setActiveBuildingId,
       showToast,
+      refreshWorkspace,
       createBuilding,
       deleteBuilding,
       updateBuildingSettings,
@@ -1310,6 +1673,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       inviteMember,
       updateMemberRole,
       revokeMember,
+      transferOwnership,
+      createAnnouncement,
+      toggleAnnouncementPin,
+      deleteAnnouncement,
+      createTicket,
+      updateTicketStatus,
+      deleteTicket,
       resetDemoData,
     }),
     [
@@ -1317,6 +1687,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       workspaceReady,
       authRequired,
       cloudConnected,
+      effectiveIsFounder,
       data,
       t,
       activeTab,
@@ -1328,6 +1699,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       buildingPayments,
       buildingExpenses,
       buildingMemberships,
+      buildingAnnouncements,
+      buildingTickets,
+      buildingAuditLogs,
+      openTicketsCount,
       planAccess,
       toast,
       setLocale,
@@ -1335,6 +1710,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setWhatsappLang,
       setActiveBuildingId,
       showToast,
+      refreshWorkspace,
       createBuilding,
       deleteBuilding,
       updateBuildingSettings,
@@ -1356,6 +1732,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       inviteMember,
       updateMemberRole,
       revokeMember,
+      transferOwnership,
+      createAnnouncement,
+      toggleAnnouncementPin,
+      deleteAnnouncement,
+      createTicket,
+      updateTicketStatus,
+      deleteTicket,
       resetDemoData,
     ]
   );

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileText,
   LayoutGrid,
   MessageCircle,
@@ -24,6 +25,7 @@ import {
   normalizeBillingCycle,
   shiftMonthKey,
 } from "@/lib/calculations";
+import { exportPaymentsCsv } from "@/lib/export-csv";
 import {
   buildReceiptMessage,
   buildReminderMessage,
@@ -242,6 +244,22 @@ export function PaymentsTab() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() =>
+              exportPaymentsCsv(
+                activeBuilding,
+                buildingApartments,
+                buildingPayments,
+                locale
+              )
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <Download className="h-3.5 w-3.5 text-zinc-400" />
+            <span className="hidden sm:inline">{t.payments.exportCsv}</span>
+          </button>
+
           {/* Monthly vs 12-Month Matrix View Switcher */}
           <div className="inline-flex rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
             <button

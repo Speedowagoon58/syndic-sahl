@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { FileCheck2, MessageCircle, Printer } from "lucide-react";
+import { Download, FileCheck2, MessageCircle, Printer } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import {
   computeAllTimeCategoryTotals,
@@ -11,6 +11,7 @@ import {
   formatMAD,
   formatMonthLabel,
 } from "@/lib/calculations";
+import { exportArrearsCsv, exportPaymentsCsv } from "@/lib/export-csv";
 import { buildReportSummaryMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 import type { ExpenseCategory } from "@/lib/types";
 
@@ -173,6 +174,39 @@ export function ReportTab() {
               {t.report.modeMonth}
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              exportPaymentsCsv(
+                activeBuilding,
+                buildingApartments,
+                buildingPayments,
+                locale
+              )
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <Download className="h-3.5 w-3.5 text-zinc-400" />
+            <span>{t.report.exportPaymentsCsv}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              exportArrearsCsv(
+                activeBuilding,
+                buildingApartments,
+                buildingPayments,
+                selectedMonthKey,
+                locale
+              )
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <Download className="h-3.5 w-3.5 text-zinc-400" />
+            <span>{t.report.exportArrearsCsv}</span>
+          </button>
 
           <a
             href={waSummaryUrl}
