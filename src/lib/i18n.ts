@@ -15,6 +15,9 @@ const fr = {
     linkCopied: "Lien résidents copié !",
     switchBuilding: "Immeuble actif",
     adminLink: "Admin",
+    landingLink: "Accueil",
+    loginLink: "Connexion",
+    lotActivePlural: "lots actifs",
     darkMode: "Mode sombre",
     lightMode: "Mode clair",
     cloudSynced: "Cloud Neon",
@@ -78,6 +81,9 @@ const fr = {
     notePlaceholder: "Ex: Virement CIH, remis au gardien...",
     confirmPayment: "Valider & créer le reçu",
     cancel: "Annuler",
+    colFee: "Cotisation",
+    colStatus: "Statut",
+    colActions: "Actions",
     methods: {
       cash: "Espèces (Cash)",
       virement: "Virement bancaire",
@@ -107,6 +113,10 @@ const fr = {
     noPhoto: "Sans photo",
     deleteExpense: "Supprimer",
     confirmDelete: "Supprimer cette dépense ?",
+    colDate: "Date",
+    colReceipt: "Justificatif",
+    colAmount: "Montant",
+    receiptsCountLabel: "Pièces justificatives",
     categories: {
       gardiennage: "Concierge / Gardien",
       eau_electricite: "Eau & Électricité",
@@ -148,6 +158,7 @@ const fr = {
     syndicSignature: "Visa du Syndic",
     councilSignature: "Visa du Conseil Syndical / AG",
     countUnit: "dépense(s)",
+    colAmount: "Montant",
   },
   subscription: {
     title: "Abonnement & Paiement",
@@ -320,6 +331,10 @@ const fr = {
     activateSixMonths: "+6 mois (700 MAD)",
     markExpired: "Expirer",
     viewProof: "Voir reçu",
+    protectedTitle: "Espace Fondateur protégé",
+    protectedDesc:
+      "Connectez-vous avec votre compte Google pour valider les activations et gérer les abonnements.",
+    signInGoogleBtn: "Se connecter avec Google",
   },
   common: {
     close: "Fermer",
@@ -377,6 +392,9 @@ const ar: TranslationDict = {
     linkCopied: "تم نسخ رابط السكان!",
     switchBuilding: "العمارة الحالية",
     adminLink: "الإدارة",
+    landingLink: "الرئيسية",
+    loginLink: "دخول",
+    lotActivePlural: "شقة نشطة",
     darkMode: "الوضع الليلي",
     lightMode: "الوضع النهاري",
     cloudSynced: "سحابة Neon",
@@ -440,6 +458,9 @@ const ar: TranslationDict = {
     notePlaceholder: "مثال: تحويل بنكي CIH، سلم للحارس...",
     confirmPayment: "تأكيد وإنشاء الوصل",
     cancel: "إلغاء",
+    colFee: "المساهمة",
+    colStatus: "الحالة",
+    colActions: "الإجراءات",
     methods: {
       cash: "نقداً (Cash)",
       virement: "تحويل بنكي",
@@ -469,6 +490,10 @@ const ar: TranslationDict = {
     noPhoto: "بدون صورة",
     deleteExpense: "حذف",
     confirmDelete: "هل تريد حذف هذا المصروف؟",
+    colDate: "التاريخ",
+    colReceipt: "الفاتورة",
+    colAmount: "المبلغ",
+    receiptsCountLabel: "الفواتير الموثقة",
     categories: {
       gardiennage: "الحراسة / البواب",
       eau_electricite: "الماء والكهرباء",
@@ -510,6 +535,7 @@ const ar: TranslationDict = {
     syndicSignature: "توقيع السانديك",
     councilSignature: "توقيع مجلس الاتحاد / الجمع العام",
     countUnit: "مصروف",
+    colAmount: "المبلغ",
   },
   subscription: {
     title: "الاشتراك والأداء",
@@ -682,6 +708,10 @@ const ar: TranslationDict = {
     activateSixMonths: "+6 أشهر (700 درهم)",
     markExpired: "إنهاء الصلاحية",
     viewProof: "عرض الوصل",
+    protectedTitle: "فضاء المؤسس محمي",
+    protectedDesc:
+      "سجّل الدخول بحساب Google للمصادقة على طلبات التفعيل وإدارة اشتراكات العمارات.",
+    signInGoogleBtn: "تسجيل الدخول بحساب Google",
   },
   common: {
     close: "إغلاق",

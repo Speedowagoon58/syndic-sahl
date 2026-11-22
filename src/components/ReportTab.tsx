@@ -129,21 +129,23 @@ export function ReportTab() {
       {/* Top Action Header */}
       <div className="no-print flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-950">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
             {t.report.title}
           </h1>
-          <p className="mt-0.5 text-xs text-zinc-500">{t.report.subtitle}</p>
+          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+            {t.report.subtitle}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5">
+          <div className="inline-flex rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
             <button
               type="button"
               onClick={() => setMode("decret")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 mode === "decret"
-                  ? "bg-white text-zinc-950 shadow-2xs"
-                  : "text-zinc-500 hover:text-zinc-900"
+                  ? "bg-white text-zinc-950 shadow-2xs dark:bg-zinc-800 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               }`}
             >
               {t.report.modeDecret}
@@ -153,8 +155,8 @@ export function ReportTab() {
               onClick={() => setMode("all")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 mode === "all"
-                  ? "bg-white text-zinc-950 shadow-2xs"
-                  : "text-zinc-500 hover:text-zinc-900"
+                  ? "bg-white text-zinc-950 shadow-2xs dark:bg-zinc-800 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               }`}
             >
               {t.report.modeAll}
@@ -164,8 +166,8 @@ export function ReportTab() {
               onClick={() => setMode("month")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 mode === "month"
-                  ? "bg-white text-zinc-950 shadow-2xs"
-                  : "text-zinc-500 hover:text-zinc-900"
+                  ? "bg-white text-zinc-950 shadow-2xs dark:bg-zinc-800 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               }`}
             >
               {t.report.modeMonth}
@@ -176,16 +178,16 @@ export function ReportTab() {
             href={waSummaryUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
-            <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+            <MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>{t.report.shareWaBtn}</span>
           </a>
 
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs hover:bg-zinc-800"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
           >
             <Printer className="h-3.5 w-3.5" />
             <span>{t.report.printBtn}</span>
@@ -284,7 +286,7 @@ export function ReportTab() {
                     </th>
                     <th className="px-3 py-2 text-start">{t.report.postCol}</th>
                     <th className="px-3 py-2 text-end">%</th>
-                    <th className="py-2 ps-3 pe-4 text-end">Montant</th>
+                    <th className="py-2 ps-3 pe-4 text-end">{t.report.colAmount}</th>
                   </tr>
                 </thead>
               )}

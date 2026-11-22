@@ -99,10 +99,10 @@ export function SubscriptionTab() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-950">
+        <h1 className="text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
           {t.subscription.title}
         </h1>
-        <p className="mt-0.5 text-xs text-zinc-500">
+        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
           {t.subscription.subtitle}
         </p>
       </div>
@@ -110,22 +110,22 @@ export function SubscriptionTab() {
       {/* Pricing Cards — Restrained Linear / Stripe aesthetic */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Free Tier */}
-        <div className="flex flex-col justify-between rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs">
+        <div className="flex flex-col justify-between rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
           <div>
-            <span className="text-xs font-semibold text-zinc-500">
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
               {t.subscription.freeTierName}
             </span>
-            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950">
+            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
               {t.subscription.freeTierPrice}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               {t.subscription.freeTierLimit}
             </p>
           </div>
-          <div className="mt-6 border-t border-zinc-100 pt-3 text-xs text-zinc-400">
+          <div className="mt-6 border-t border-zinc-100 pt-3 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
             {activeUnits <= 8
               ? "Actif pour cet immeuble"
-              : `${activeUnits} lots actifs`}
+              : `${activeUnits} ${t.header.lotActivePlural}`}
           </div>
         </div>
 
@@ -134,26 +134,26 @@ export function SubscriptionTab() {
           onClick={() => setSelectedPlan("semi_annual")}
           className={`cursor-pointer flex flex-col justify-between rounded-xl border p-5 transition-all ${
             selectedPlan === "semi_annual"
-              ? "border-zinc-900 bg-white ring-1 ring-zinc-900"
-              : "border-zinc-200/90 bg-white hover:border-zinc-300"
+              ? "border-zinc-900 bg-white ring-1 ring-zinc-900 dark:border-zinc-200 dark:bg-[#111113] dark:ring-zinc-200"
+              : "border-zinc-200/90 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-[#111113] dark:hover:border-zinc-700"
           }`}
         >
           <div>
-            <span className="text-xs font-semibold text-zinc-700">
+            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
               {t.subscription.semiAnnualName}
             </span>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="tabular-nums text-2xl font-semibold tracking-tight text-zinc-950">
+              <span className="tabular-nums text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
                 {t.subscription.semiAnnualPrice}
               </span>
-              <span className="text-xs text-zinc-400">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
                 {t.subscription.semiAnnualPeriod}
               </span>
             </div>
-            <ul className="mt-4 space-y-2 text-xs text-zinc-600">
+            <ul className="mt-4 space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
               {t.subscription.featuresList.slice(0, 3).map((feat) => (
                 <li key={feat} className="flex items-start gap-2">
-                  <Check className="h-3.5 w-3.5 text-zinc-900 shrink-0 mt-0.5" />
+                  <Check className="h-3.5 w-3.5 text-zinc-900 shrink-0 mt-0.5 dark:text-zinc-200" />
                   <span>{feat}</span>
                 </li>
               ))}
@@ -164,8 +164,8 @@ export function SubscriptionTab() {
             onClick={() => setSelectedPlan("semi_annual")}
             className={`mt-6 w-full rounded-lg py-2 text-xs font-medium transition-colors ${
               selectedPlan === "semi_annual"
-                ? "bg-zinc-900 text-white"
-                : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
+                : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
             }`}
           >
             {selectedPlan === "semi_annual"
@@ -179,34 +179,34 @@ export function SubscriptionTab() {
           onClick={() => setSelectedPlan("annual")}
           className={`cursor-pointer flex flex-col justify-between rounded-xl border p-5 transition-all ${
             selectedPlan === "annual"
-              ? "border-zinc-900 bg-white ring-1 ring-zinc-900"
-              : "border-zinc-200/90 bg-white hover:border-zinc-300"
+              ? "border-zinc-900 bg-white ring-1 ring-zinc-900 dark:border-zinc-200 dark:bg-[#111113] dark:ring-zinc-200"
+              : "border-zinc-200/90 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-[#111113] dark:hover:border-zinc-700"
           }`}
         >
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-900">
+              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
                 {t.subscription.annualName}
               </span>
-              <span className="rounded-md bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-white">
+              <span className="rounded-md bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-white dark:bg-zinc-100 dark:text-zinc-950">
                 {t.subscription.recommendedBadge}
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="tabular-nums text-2xl font-semibold tracking-tight text-zinc-950">
+              <span className="tabular-nums text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
                 {t.subscription.annualPrice}
               </span>
-              <span className="text-xs text-zinc-400">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
                 {t.subscription.annualPeriod}
               </span>
             </div>
-            <p className="mt-1 text-xs text-emerald-700 font-medium">
+            <p className="mt-1 text-xs text-emerald-700 font-medium dark:text-emerald-400">
               {t.subscription.perAptNote}
             </p>
-            <ul className="mt-4 space-y-2 text-xs text-zinc-600">
+            <ul className="mt-4 space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
               {t.subscription.featuresList.map((feat) => (
                 <li key={feat} className="flex items-start gap-2">
-                  <Check className="h-3.5 w-3.5 text-zinc-900 shrink-0 mt-0.5" />
+                  <Check className="h-3.5 w-3.5 text-zinc-900 shrink-0 mt-0.5 dark:text-zinc-200" />
                   <span>{feat}</span>
                 </li>
               ))}
@@ -217,8 +217,8 @@ export function SubscriptionTab() {
             onClick={() => setSelectedPlan("annual")}
             className={`mt-6 w-full rounded-lg py-2 text-xs font-medium transition-colors ${
               selectedPlan === "annual"
-                ? "bg-zinc-900 text-white"
-                : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
+                : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
             }`}
           >
             {selectedPlan === "annual"
@@ -230,23 +230,23 @@ export function SubscriptionTab() {
 
       {/* Moroccan Payment Box: Virement / CashPlus */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-zinc-200/90 bg-white p-6 shadow-2xs lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-4">
-            <h2 className="text-sm font-semibold text-zinc-950">
+        <div className="rounded-xl border border-zinc-200/90 bg-white p-6 shadow-2xs dark:border-zinc-800 dark:bg-[#111113] lg:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
               {t.subscription.paymentTitle} —{" "}
-              <span className="tabular-nums text-zinc-900">
+              <span className="tabular-nums text-zinc-900 dark:text-zinc-100">
                 {formatMAD(PLANS[selectedPlan].priceMAD, locale)}
               </span>
             </h2>
 
-            <div className="inline-flex rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5">
+            <div className="inline-flex rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
               <button
                 type="button"
                 onClick={() => setChannel("virement")}
                 className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                   channel === "virement"
-                    ? "bg-white text-zinc-950 shadow-2xs"
-                    : "text-zinc-500"
+                    ? "bg-white text-zinc-950 shadow-2xs dark:bg-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 dark:text-zinc-400"
                 }`}
               >
                 {t.subscription.tabVirement}
@@ -256,8 +256,8 @@ export function SubscriptionTab() {
                 onClick={() => setChannel("cashplus")}
                 className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                   channel === "cashplus"
-                    ? "bg-white text-zinc-950 shadow-2xs"
-                    : "text-zinc-500"
+                    ? "bg-white text-zinc-950 shadow-2xs dark:bg-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 dark:text-zinc-400"
                 }`}
               >
                 {t.subscription.tabCashplus}
@@ -266,64 +266,68 @@ export function SubscriptionTab() {
           </div>
 
           {channel === "virement" ? (
-            <div className="mt-4 space-y-2.5 rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-4 text-xs">
+            <div className="mt-4 space-y-2.5 rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-4 text-xs dark:border-zinc-800 dark:bg-zinc-950">
               <div className="flex flex-wrap justify-between gap-2">
-                <span className="text-zinc-500">
+                <span className="text-zinc-500 dark:text-zinc-400">
                   {t.subscription.bankNameLabel}
                 </span>
-                <span className="font-medium text-zinc-900">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
                   {FOUNDER_BANK_NAME}
                 </span>
               </div>
               <div className="flex flex-wrap justify-between gap-2">
-                <span className="text-zinc-500">
+                <span className="text-zinc-500 dark:text-zinc-400">
                   {t.subscription.holderLabel}
                 </span>
-                <span className="font-medium text-zinc-900">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
                   {FOUNDER_ACCOUNT_HOLDER}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200/70 pt-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200/70 pt-2.5 dark:border-zinc-800">
                 <div>
-                  <span className="block text-zinc-400">
+                  <span className="block text-zinc-400 dark:text-zinc-500">
                     {t.subscription.ribLabel}
                   </span>
-                  <span className="font-mono text-sm font-semibold text-zinc-950">
+                  <span className="font-mono text-sm font-semibold text-zinc-950 dark:text-zinc-100">
                     {FOUNDER_RIB}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleCopy(FOUNDER_RIB)}
-                  className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                  className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 >
                   <Copy className="h-3 w-3" />
                   {t.subscription.copyRib}
                 </button>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200/70 pt-2.5">
-                <span className="text-zinc-500">{t.subscription.refLabel}</span>
-                <span className="rounded-md border border-zinc-300 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-zinc-900">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200/70 pt-2.5 dark:border-zinc-800">
+                <span className="text-zinc-500 dark:text-zinc-400">
+                  {t.subscription.refLabel}
+                </span>
+                <span className="rounded-md border border-zinc-300 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
                   {referenceCode}
                 </span>
               </div>
             </div>
           ) : (
-            <div className="mt-4 space-y-2.5 rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-4 text-xs">
-              <p className="text-zinc-600">
+            <div className="mt-4 space-y-2.5 rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-4 text-xs dark:border-zinc-800 dark:bg-zinc-950">
+              <p className="text-zinc-600 dark:text-zinc-400">
                 {t.subscription.cashplusInstructions}
               </p>
-              <div className="flex flex-wrap justify-between gap-2 border-t border-zinc-200/70 pt-2.5">
-                <span className="text-zinc-500">
+              <div className="flex flex-wrap justify-between gap-2 border-t border-zinc-200/70 pt-2.5 dark:border-zinc-800">
+                <span className="text-zinc-500 dark:text-zinc-400">
                   {t.subscription.cashplusRecipient}
                 </span>
-                <span className="font-medium text-zinc-900">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
                   {FOUNDER_CASHPLUS_NAME}
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-zinc-500">{t.subscription.refLabel}</span>
-                <span className="rounded-md border border-zinc-300 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-zinc-900">
+                <span className="text-zinc-500 dark:text-zinc-400">
+                  {t.subscription.refLabel}
+                </span>
+                <span className="rounded-md border border-zinc-300 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
                   {referenceCode}
                 </span>
               </div>
@@ -332,11 +336,11 @@ export function SubscriptionTab() {
 
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+              <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                 {t.subscription.proofLabel}
               </label>
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs font-medium text-zinc-600 hover:border-zinc-900">
-                <Camera className="h-4 w-4 text-zinc-500" />
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs font-medium text-zinc-600 hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-400">
+                <Camera className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                 <span>
                   {proofUrl ? t.expenses.photoReady : t.expenses.photoHint}
                 </span>
@@ -350,7 +354,7 @@ export function SubscriptionTab() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+              <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                 {t.subscription.noteLabel}
               </label>
               <input
@@ -358,13 +362,13 @@ export function SubscriptionTab() {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={t.subscription.notePlaceholder}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-400"
               />
             </div>
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-5 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 transition-colors"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-5 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 transition-colors"
             >
               <MessageCircle className="h-4 w-4" />
               {t.subscription.submitBtn}
@@ -374,56 +378,56 @@ export function SubscriptionTab() {
 
         {/* Neighbor Pitch Card & Request History */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs">
-            <h3 className="text-sm font-semibold text-zinc-950">
+          <div className="rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
+            <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
               {t.subscription.convinceTitle}
             </h3>
-            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
               {t.subscription.convinceDesc}
             </p>
             <a
               href={neighborPitchUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-800 hover:bg-zinc-100"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
-              <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+              <MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               {t.subscription.convinceBtn}
             </a>
           </div>
 
           {buildingRequests.length > 0 && (
-            <div className="rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs">
-              <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-400">
+            <div className="rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
+              <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-400 dark:text-zinc-500">
                 {t.subscription.requestsHistory}
               </h3>
               <div className="space-y-2">
                 {buildingRequests.map((req) => (
                   <div
                     key={req.id}
-                    className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50/70 px-3 py-2 text-xs"
+                    className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50/70 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
                   >
                     <div>
-                      <p className="tabular-nums font-medium text-zinc-900">
+                      <p className="tabular-nums font-medium text-zinc-900 dark:text-zinc-100">
                         {formatMAD(req.amountMAD, locale)} • {req.referenceCode}
                       </p>
-                      <p className="text-[11px] text-zinc-400">
+                      <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
                         {formatDateShort(req.createdAt, locale)}
                       </p>
                     </div>
                     <span
                       className={`inline-flex items-center gap-1 text-[11px] font-medium ${
                         req.status === "approved"
-                          ? "text-emerald-700"
+                          ? "text-emerald-700 dark:text-emerald-400"
                           : req.status === "rejected"
-                          ? "text-red-600"
-                          : "text-amber-700"
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-amber-700 dark:text-amber-400"
                       }`}
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
                           req.status === "approved"
-                            ? "bg-emerald-600"
+                            ? "bg-emerald-600 dark:bg-emerald-400"
                             : req.status === "rejected"
                             ? "bg-red-500"
                             : "bg-amber-500"

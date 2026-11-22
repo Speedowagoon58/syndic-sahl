@@ -33,6 +33,7 @@ export async function ensureNeonSchema(): Promise<void> {
       await sql`
         create table if not exists syndic_buildings (
           id text primary key,
+          owner_id text,
           name text not null,
           city text not null default '',
           default_monthly_fee numeric(12, 2) not null default 200,
@@ -48,6 +49,8 @@ export async function ensureNeonSchema(): Promise<void> {
           created_at timestamptz not null default now()
         )
       `;
+
+      await sql`alter table syndic_buildings add column if not exists owner_id text`;
 
       await sql`
         create table if not exists syndic_apartments (

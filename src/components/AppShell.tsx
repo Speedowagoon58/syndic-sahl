@@ -16,6 +16,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { AuthControls } from "@/components/AuthControls";
 import { APP_NAME, APP_NAME_AR } from "@/lib/config";
 import { formatDateShort } from "@/lib/calculations";
 import type { AppTab } from "@/lib/types";
@@ -125,7 +126,7 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
               aria-label={t.header.switchBuilding}
               value={activeBuilding.id}
               onChange={(e) => setActiveBuildingId(e.target.value)}
-              className="w-full appearance-none rounded-lg border border-zinc-200/90 bg-white ps-3 pe-8 py-2 text-xs font-semibold text-zinc-900 shadow-2xs hover:border-zinc-300 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+              className="w-full appearance-none [-webkit-appearance:none] [-moz-appearance:none] bg-none rounded-lg border border-zinc-200/90 bg-white ps-3 pe-8 py-2 text-xs font-semibold text-zinc-900 shadow-2xs hover:border-zinc-300 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
             >
               {data.buildings.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -194,7 +195,10 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 <ArrowUpRight className="h-3 w-3" />
               </Link>
             </div>
-            <p className="mt-1 truncate font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+            <p
+              dir="ltr"
+              className="mt-1 truncate text-start font-mono text-[11px] text-zinc-400 dark:text-zinc-500"
+            >
               /r/{activeBuilding.shareSlug}
             </p>
             <button
@@ -206,6 +210,8 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
               <span>{t.settings.copyPortal}</span>
             </button>
           </div>
+
+          <AuthControls variant="sidebar" />
 
           {/* Cloud status + Plan status */}
           <div className="flex items-center justify-between px-1 text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -238,18 +244,18 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
             </span>
           </div>
 
-          <div className="flex items-center justify-between px-1 text-[11px] text-zinc-400">
+          <div className="flex items-center justify-between px-1 text-[11px] text-zinc-400 dark:text-zinc-500">
             <Link
               href="/landing"
               className="font-medium hover:text-zinc-800 dark:hover:text-zinc-200"
             >
-              Landing
+              {t.header.landingLink}
             </Link>
             <Link
-              href="/login"
+              href="/sign-in"
               className="font-medium hover:text-zinc-800 dark:hover:text-zinc-200"
             >
-              Login
+              {t.header.loginLink}
             </Link>
             <Link
               href="/admin"
@@ -334,7 +340,11 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
               <ArrowUpRight className="h-3.5 w-3.5 text-zinc-400" />
             </Link>
 
-            {/* Mobile dark mode & language toggles */}
+            {/* Mobile auth, dark mode & language toggles */}
+            <div className="lg:hidden">
+              <AuthControls variant="header" />
+            </div>
+
             <button
               type="button"
               onClick={toggleTheme}

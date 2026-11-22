@@ -61,14 +61,15 @@ export default function PublicResidentPortalPage() {
     city: string;
   } | null>(null);
 
-  const fetchCloudPortal = useCallback(
-    async (pin?: string) => {
+  const verifyCloudPin = useCallback(
+    async (pin: string) => {
       if (!slug) return;
-      const qs = pin ? `?pin=${encodeURIComponent(pin)}` : "";
       try {
-        const res = await fetch(
-          `/api/public/${encodeURIComponent(slug)}${qs}`
-        );
+        const res = await fetch(`/api/public/${encodeURIComponent(slug)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin }),
+        });
         if (res.status === 404) {
           setCloudMode("cloud");
           setCloudNotFound(true);
@@ -86,9 +87,7 @@ export default function PublicResidentPortalPage() {
             buildingName: json.buildingName ?? slug,
             city: json.city ?? "",
           });
-          if (json.pinInvalid) {
-            setPinError(true);
-          }
+          setPinError(Boolean(json.pinInvalid ?? true));
           return;
         }
         if (res.ok && json.building) {
@@ -132,7 +131,7 @@ export default function PublicResidentPortalPage() {
           setCloudLoading(false);
           return;
         }
-        if (res.status === 401 && json.requiresPin) {
+        if (json.requiresPin) {
           setCloudMode("cloud");
           setCloudPinRequired({
             buildingName: json.buildingName ?? slug,
@@ -222,7 +221,7 @@ export default function PublicResidentPortalPage() {
   if (cloudMode === "cloud" && cloudPinRequired && !unlocked) {
     const handleCloudPinSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      void fetchCloudPortal(pinInput.trim());
+      void verifyCloudPin(pinInput.trim());
     };
 
     return (
@@ -377,7 +376,9 @@ export default function PublicResidentPortalPage() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-md border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+              aria-label={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+              title={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+              className="rounded-md border border-zinc-200 bg-white p-1.5 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               {theme === "dark" ? (
                 <Sun className="h-3.5 w-3.5" />
@@ -474,6 +475,7 @@ export default function PublicResidentPortalPage() {
             <div className="inline-flex items-center rounded-lg border border-zinc-200/90 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
               <button
                 type="button"
+                aria-label={locale === "ar" ? "الشهر السابق" : "Mois précédent"}
                 onClick={() => setMonthKey(shiftMonthKey(monthKey, -1))}
                 className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
               >
@@ -484,6 +486,7 @@ export default function PublicResidentPortalPage() {
               </span>
               <button
                 type="button"
+                aria-label={locale === "ar" ? "الشهر التالي" : "Mois suivant"}
                 onClick={() => setMonthKey(shiftMonthKey(monthKey, 1))}
                 className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
               >

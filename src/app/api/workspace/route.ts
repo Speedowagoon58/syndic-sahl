@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { ensureNeonSchema, getSql, seedNeonDatabase } from "@/lib/neon";
 import type {
   Apartment,
@@ -7,6 +8,56 @@ import type {
   Payment,
   SubscriptionRequest,
 } from "@/lib/types";
+
+const ALLOWED_ACTIONS = new Set([
+  "create_building",
+  "update_building",
+  "add_apartments",
+  "update_apartment",
+  "record_payment",
+  "record_payments_batch",
+  "delete_building",
+  "cancel_payment",
+  "add_expense",
+  "delete_expense",
+  "submit_subscription_request",
+  "update_subscription_request",
+  "reset_demo",
+]);
+
+const PROTECTED_ADMIN_ACTIONS = new Set([
+  "update_subscription_request",
+  "reset_demo",
+]);
+
+function isClerkConfigured(): boolean {
+  return Boolean(
+    process.env.CLERK_SECRET_KEY &&
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  );
+}
+
+async function getSignedInUserId(): Promise<string | null> {
+  if (!isClerkConfigured()) return null;
+  try {
+    const { userId } = await auth();
+    return userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function isPositiveFinite(val: unknown): val is number {
+  const n = Number(val);
+  return Number.isFinite(n) && n > 0;
+}
+
+function badRequest(error: string, message?: string) {
+  return NextResponse.json(
+    { mode: "error", ok: false, error, message: message ?? error },
+    { status: 400 }
+  );
+}
 
 export async function GET() {
   const sql = getSql();
@@ -112,6 +163,38 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  let body: { action?: unknown; payload?: unknown };
+  try {
+    body = (await request.json()) as { action?: unknown; payload?: unknown };
+  } catch {
+    return badRequest("invalid_json", "Invalid JSON request body");
+  }
+
+  if (
+    !body ||
+    typeof body !== "object" ||
+    typeof body.action !== "string" ||
+    !ALLOWED_ACTIONS.has(body.action)
+  ) {
+    return badRequest("invalid_action", "Unsupported or missing action");
+  }
+
+  const action = body.action;
+  const payload =
+    body.payload && typeof body.payload === "object"
+      ? (body.payload as Record<string, unknown>)
+      : {};
+
+  if (PROTECTED_ADMIN_ACTIONS.has(action) && isClerkConfigured()) {
+    const userId = await getSignedInUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { mode: "error", ok: false, error: "unauthorized" },
+        { status: 401 }
+      );
+    }
+  }
+
   const sql = getSql();
   if (!sql) {
     return NextResponse.json({ mode: "local", ok: true });
@@ -119,27 +202,29 @@ export async function POST(request: Request) {
 
   try {
     await ensureNeonSchema();
-    const body = (await request.json()) as {
-      action: string;
-      payload?: Record<string, unknown>;
-    };
-    const { action, payload = {} } = body;
 
     if (action === "create_building") {
-      const b = payload.building as Building;
-      const units = (payload.apartments as Apartment[]) ?? [];
+      const b = payload.building as Building | undefined;
+      if (!b || !b.id?.trim() || !b.name?.trim() || !b.shareSlug?.trim()) {
+        return badRequest("invalid_building", "Building id, name and slug are required");
+      }
+      const userId = await getSignedInUserId();
+      const units = Array.isArray(payload.apartments)
+        ? (payload.apartments as Apartment[])
+        : [];
       await sql`
         insert into syndic_buildings (
-          id, name, city, default_monthly_fee, opening_balance, start_month,
+          id, owner_id, name, city, default_monthly_fee, opening_balance, start_month,
           rib, share_slug, share_pin, show_names_publicly, plan_status,
           trial_ends_at, plan_expires_at, created_at
         ) values (
-          ${b.id}, ${b.name}, ${b.city}, ${b.defaultMonthlyFee}, ${b.openingBalance}, ${b.startMonth},
+          ${b.id}, ${userId}, ${b.name}, ${b.city}, ${b.defaultMonthlyFee}, ${b.openingBalance}, ${b.startMonth},
           ${b.rib}, ${b.shareSlug}, ${b.sharePin}, ${b.showNamesPublicly}, ${b.planStatus},
           ${b.trialEndsAt}, ${b.planExpiresAt}, ${b.createdAt}
         ) on conflict (id) do nothing
       `;
       for (const a of units) {
+        if (!a?.id || !a?.unitLabel) continue;
         await sql`
           insert into syndic_apartments (
             id, building_id, unit_label, resident_name, phone, monthly_fee, active, sort_order
@@ -150,7 +235,10 @@ export async function POST(request: Request) {
         `;
       }
     } else if (action === "update_building") {
-      const b = payload.building as Building;
+      const b = payload.building as Building | undefined;
+      if (!b || !b.id?.trim() || !b.name?.trim()) {
+        return badRequest("invalid_building", "Building id and name are required");
+      }
       await sql`
         update syndic_buildings set
           name = ${b.name},
@@ -167,8 +255,16 @@ export async function POST(request: Request) {
         where id = ${b.id}
       `;
     } else if (action === "add_apartments") {
-      const units = (payload.apartments as Apartment[]) ?? [];
+      const units = Array.isArray(payload.apartments)
+        ? (payload.apartments as Apartment[])
+        : [];
+      if (units.length === 0) {
+        return badRequest("invalid_apartments", "At least one apartment is required");
+      }
       for (const a of units) {
+        if (!a?.id || !a?.buildingId || !a?.unitLabel) {
+          return badRequest("invalid_apartment", "Apartment id, buildingId and unitLabel are required");
+        }
         await sql`
           insert into syndic_apartments (
             id, building_id, unit_label, resident_name, phone, monthly_fee, active, sort_order
@@ -179,7 +275,10 @@ export async function POST(request: Request) {
         `;
       }
     } else if (action === "update_apartment") {
-      const a = payload.apartment as Apartment;
+      const a = payload.apartment as Apartment | undefined;
+      if (!a || !a.id?.trim() || !a.unitLabel?.trim()) {
+        return badRequest("invalid_apartment", "Apartment id and unitLabel are required");
+      }
       await sql`
         update syndic_apartments set
           unit_label = ${a.unitLabel},
@@ -190,7 +289,17 @@ export async function POST(request: Request) {
         where id = ${a.id}
       `;
     } else if (action === "record_payment") {
-      const p = payload.payment as Payment;
+      const p = payload.payment as Payment | undefined;
+      if (
+        !p ||
+        !p.id?.trim() ||
+        !p.buildingId?.trim() ||
+        !p.apartmentId?.trim() ||
+        !p.monthKey?.trim() ||
+        !isPositiveFinite(p.amount)
+      ) {
+        return badRequest("invalid_payment", "Valid payment id, buildingId, apartmentId, monthKey and positive amount are required");
+      }
       await sql`
         insert into syndic_payments (
           id, building_id, apartment_id, month_key, amount, method, receipt_number, note, paid_at
@@ -207,8 +316,23 @@ export async function POST(request: Request) {
           paid_at = excluded.paid_at
       `;
     } else if (action === "record_payments_batch") {
-      const list = (payload.payments as Payment[]) ?? [];
+      const list = Array.isArray(payload.payments)
+        ? (payload.payments as Payment[])
+        : [];
+      if (list.length === 0) {
+        return badRequest("invalid_payments", "Non-empty payments array is required");
+      }
       for (const p of list) {
+        if (
+          !p ||
+          !p.id?.trim() ||
+          !p.buildingId?.trim() ||
+          !p.apartmentId?.trim() ||
+          !p.monthKey?.trim() ||
+          !isPositiveFinite(p.amount)
+        ) {
+          return badRequest("invalid_payment", "Each payment must include valid IDs and positive amount");
+        }
         await sql`
           insert into syndic_payments (
             id, building_id, apartment_id, month_key, amount, method, receipt_number, note, paid_at
@@ -226,13 +350,28 @@ export async function POST(request: Request) {
         `;
       }
     } else if (action === "delete_building") {
-      const buildingId = String(payload.buildingId ?? "");
+      const buildingId = String(payload.buildingId ?? "").trim();
+      if (!buildingId) {
+        return badRequest("invalid_building_id", "buildingId is required");
+      }
       await sql`delete from syndic_buildings where id = ${buildingId}`;
     } else if (action === "cancel_payment") {
-      const paymentId = String(payload.paymentId ?? "");
+      const paymentId = String(payload.paymentId ?? "").trim();
+      if (!paymentId) {
+        return badRequest("invalid_payment_id", "paymentId is required");
+      }
       await sql`delete from syndic_payments where id = ${paymentId}`;
     } else if (action === "add_expense") {
-      const e = payload.expense as Expense;
+      const e = payload.expense as Expense | undefined;
+      if (
+        !e ||
+        !e.id?.trim() ||
+        !e.buildingId?.trim() ||
+        !e.description?.trim() ||
+        !isPositiveFinite(e.amount)
+      ) {
+        return badRequest("invalid_expense", "Expense id, buildingId, description and positive amount are required");
+      }
       await sql`
         insert into syndic_expenses (
           id, building_id, category, amount, expense_date, description, receipt_photo_url, created_at
@@ -242,10 +381,21 @@ export async function POST(request: Request) {
         ) on conflict (id) do nothing
       `;
     } else if (action === "delete_expense") {
-      const expenseId = String(payload.expenseId ?? "");
+      const expenseId = String(payload.expenseId ?? "").trim();
+      if (!expenseId) {
+        return badRequest("invalid_expense_id", "expenseId is required");
+      }
       await sql`delete from syndic_expenses where id = ${expenseId}`;
     } else if (action === "submit_subscription_request") {
-      const r = payload.request as SubscriptionRequest;
+      const r = payload.request as SubscriptionRequest | undefined;
+      if (
+        !r ||
+        !r.id?.trim() ||
+        !r.buildingId?.trim() ||
+        !isPositiveFinite(r.amountMAD)
+      ) {
+        return badRequest("invalid_request", "Valid subscription request payload is required");
+      }
       await sql`
         insert into syndic_subscription_requests (
           id, building_id, building_name, reference_code, plan, amount_mad,
@@ -256,8 +406,11 @@ export async function POST(request: Request) {
         ) on conflict (id) do nothing
       `;
     } else if (action === "update_subscription_request") {
-      const requestId = String(payload.requestId ?? "");
-      const status = String(payload.status ?? "pending");
+      const requestId = String(payload.requestId ?? "").trim();
+      const status = String(payload.status ?? "pending").trim();
+      if (!requestId || !["pending", "approved", "rejected"].includes(status)) {
+        return badRequest("invalid_request_update", "Valid requestId and status are required");
+      }
       await sql`
         update syndic_subscription_requests set status = ${status} where id = ${requestId}
       `;

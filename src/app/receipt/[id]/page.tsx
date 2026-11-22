@@ -129,7 +129,9 @@ export default function ReceiptPage() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="rounded-lg border border-zinc-200 bg-white p-1.5 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+            aria-label={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+            title={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+            className="rounded-lg border border-zinc-200 bg-white p-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             {theme === "dark" ? (
               <Sun className="h-3.5 w-3.5" />

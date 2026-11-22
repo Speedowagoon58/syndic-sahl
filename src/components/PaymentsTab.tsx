@@ -209,9 +209,12 @@ export function PaymentsTab() {
           <h1 className="text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
             {t.payments.title}
           </h1>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {activeBuilding.name} • {summary.totalActiveUnits}{" "}
-            {locale === "ar" ? "شقة نشطة" : "lots actifs"}
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            <bdi className="font-medium">{activeBuilding.name}</bdi>
+            <span>•</span>
+            <span className="tabular-nums">
+              {summary.totalActiveUnits} {t.header.lotActivePlural}
+            </span>
           </p>
         </div>
 
@@ -553,9 +556,9 @@ export function PaymentsTab() {
                   <th className="px-3 py-2.5 text-start">
                     {t.report.residentCol}
                   </th>
-                  <th className="px-3 py-2.5 text-end">Cotisation</th>
-                  <th className="px-3 py-2.5 text-start">Statut</th>
-                  <th className="py-2.5 ps-3 pe-4 text-end">Actions</th>
+                  <th className="px-3 py-2.5 text-end">{t.payments.colFee}</th>
+                  <th className="px-3 py-2.5 text-start">{t.payments.colStatus}</th>
+                  <th className="py-2.5 ps-3 pe-4 text-end">{t.payments.colActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800/80">
@@ -656,6 +659,7 @@ export function PaymentsTab() {
                             <>
                               <Link
                                 href={`/receipt/${payment.id}`}
+                                title={t.payments.viewReceipt}
                                 className="inline-flex items-center gap-1 rounded-lg border border-zinc-200/90 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                               >
                                 <FileText className="h-3.5 w-3.5 text-zinc-400" />
@@ -665,10 +669,12 @@ export function PaymentsTab() {
                                 href={waUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                title={t.payments.sendReceiptWa}
+                                aria-label={t.payments.sendReceiptWa}
                                 className="inline-flex items-center gap-1 rounded-lg border border-zinc-200/90 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-400"
                               >
                                 <MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                                <span className="hidden sm:inline">
+                                <span className="hidden xl:inline">
                                   {t.payments.sendReceiptWa}
                                 </span>
                               </a>
@@ -676,6 +682,7 @@ export function PaymentsTab() {
                                 type="button"
                                 onClick={() => cancelPayment(payment.id)}
                                 title={t.payments.cancelPayment}
+                                aria-label={t.payments.cancelPayment}
                                 className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400"
                               >
                                 <RotateCcw className="h-3.5 w-3.5" />
@@ -700,10 +707,12 @@ export function PaymentsTab() {
                                 href={waUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                title={t.payments.remindWa}
+                                aria-label={t.payments.remindWa}
                                 className="inline-flex items-center gap-1 rounded-lg border border-zinc-200/90 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                               >
                                 <MessageCircle className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-                                <span className="hidden sm:inline">
+                                <span className="hidden xl:inline">
                                   {t.payments.remindWa}
                                 </span>
                               </a>
@@ -723,6 +732,9 @@ export function PaymentsTab() {
       {/* Multi-Month / Clear Arrears Payment Modal */}
       {modalInfo && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payment-modal-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
           onClick={() => setModalInfo(null)}
         >
@@ -732,7 +744,10 @@ export function PaymentsTab() {
           >
             <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
               <div>
-                <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+                <h3
+                  id="payment-modal-title"
+                  className="text-sm font-semibold text-zinc-950 dark:text-zinc-100"
+                >
                   {t.payments.modalTitle}
                 </h3>
                 <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
@@ -742,8 +757,9 @@ export function PaymentsTab() {
               </div>
               <button
                 type="button"
+                aria-label={t.payments.cancel}
                 onClick={() => setModalInfo(null)}
-                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800"
+                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
               >
                 <X className="h-4 w-4" />
               </button>

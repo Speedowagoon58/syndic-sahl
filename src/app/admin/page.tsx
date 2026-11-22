@@ -2,8 +2,11 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Eye, Moon, Sun, X } from "lucide-react";
+import { ArrowLeft, Check, Eye, Lock, Moon, Sun, X } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/context/AppContext";
+import { useAuthEnabled } from "@/components/AuthAvailability";
+import { AuthControls } from "@/components/AuthControls";
 import { PLANS } from "@/lib/config";
 import {
   formatDateShort,
@@ -13,7 +16,71 @@ import {
 } from "@/lib/calculations";
 import { ReceiptLightbox } from "@/components/ReceiptLightbox";
 
-export default function AdminPage() {
+function ClerkAdminGate({ children }: { children: React.ReactNode }) {
+  const { isLoaded, isSignedIn } = useUser();
+  const { t, theme, toggleTheme } = useApp();
+
+  if (!isLoaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400 dark:bg-[#09090B]">
+        {t.common.loading}
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen flex flex-col justify-between bg-[#F6F6F4] p-4 text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100">
+        <header className="mx-auto flex w-full max-w-5xl items-center justify-between py-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {t.admin.backToApp}
+          </Link>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+            className="rounded-lg border border-zinc-200 bg-white p-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-3.5 w-3.5" />
+            ) : (
+              <Moon className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </header>
+
+        <main className="mx-auto w-full max-w-sm py-12">
+          <div className="rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+              <Lock className="h-4 w-4" />
+            </div>
+            <h1 className="mt-4 text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+              {t.admin.protectedTitle}
+            </h1>
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              {t.admin.protectedDesc}
+            </p>
+            <Link
+              href="/sign-in"
+              className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+            >
+              {t.admin.signInGoogleBtn}
+            </Link>
+          </div>
+        </main>
+        <div />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+function AdminDashboardContent() {
   const {
     hydrated,
     data,
@@ -58,15 +125,20 @@ export default function AdminPage() {
               <h1 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
                 {t.admin.title}
               </h1>
-              <p className="text-xs text-zinc-400">{t.admin.subtitle}</p>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                {t.admin.subtitle}
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <AuthControls variant="header" />
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-lg border border-zinc-200 bg-white p-1.5 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+              aria-label={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+              title={theme === "dark" ? t.header.lightMode : t.header.darkMode}
+              className="rounded-lg border border-zinc-200 bg-white p-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               {theme === "dark" ? (
                 <Sun className="h-3.5 w-3.5" />
@@ -76,7 +148,7 @@ export default function AdminPage() {
             </button>
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               {t.admin.backToApp}
@@ -287,4 +359,18 @@ export default function AdminPage() {
       />
     </div>
   );
+}
+
+export default function AdminPage() {
+  const authEnabled = useAuthEnabled();
+
+  if (authEnabled) {
+    return (
+      <ClerkAdminGate>
+        <AdminDashboardContent />
+      </ClerkAdminGate>
+    );
+  }
+
+  return <AdminDashboardContent />;
 }

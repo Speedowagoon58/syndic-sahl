@@ -26,11 +26,6 @@ import {
   resetDemoAppData,
   saveAppData,
 } from "@/lib/storage";
-import {
-  fetchCloudWorkspace,
-  pushExpenseToCloud,
-  pushPaymentToCloud,
-} from "@/lib/supabase-sync";
 import type {
   Apartment,
   AppData,
@@ -217,6 +212,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
+    const pathname =
+      typeof window !== "undefined" ? window.location.pathname : "";
+    const skipWorkspaceFetch =
+      pathname.startsWith("/r/") ||
+      pathname.startsWith("/receipt/") ||
+      pathname.startsWith("/landing") ||
+      pathname.startsWith("/sign-in") ||
+      pathname.startsWith("/sign-up") ||
+      pathname.startsWith("/login");
+    if (skipWorkspaceFetch) return;
+
     let active = true;
     fetch("/api/workspace")
       .then((res) => (res.ok ? res.json() : null))
@@ -249,22 +255,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       })
       .catch(() => {
-        // Fallback to Supabase client or local mode below
+        // Fallback silently to local mode when offline or DB unavailable
       });
 
-    fetchCloudWorkspace().then((cloud) => {
-      if (!active || !cloud) return;
-      setCloudConnected(true);
-      setData((prev) => ({
-        ...prev,
-        activeBuildingId: cloud.buildings[0]?.id ?? prev.activeBuildingId,
-        buildings: cloud.buildings,
-        apartments: cloud.apartments,
-        payments: cloud.payments,
-        expenses: cloud.expenses,
-        subscriptionRequests: cloud.subscriptionRequests,
-      }));
-    });
     return () => {
       active = false;
     };
@@ -315,6 +308,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const t = translations[data.locale];
+
+  const handleSyncError = useCallback(() => {
+    if (cloudConnected) showToast(t.common.syncErrorToast);
+  }, [cloudConnected, showToast, t.common.syncErrorToast]);
 
   const guardWritable = useCallback((): boolean => {
     if (planAccess.isReadOnly) {
@@ -389,16 +386,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apartments: [...prev.apartments, ...newApartments],
       }));
 
-      syncWorkspaceAction("create_building", {
-        building: newBuilding,
-        apartments: newApartments,
-      }, () => {
-        if (cloudConnected) showToast(t.common.syncErrorToast);
-      });
+      syncWorkspaceAction(
+        "create_building",
+        { building: newBuilding, apartments: newApartments },
+        handleSyncError
+      );
       showToast(t.common.saved);
       return newBuilding;
     },
-    [cloudConnected, data.buildings, showToast, t.common.saved, t.common.syncErrorToast]
+    [data.buildings, handleSyncError, showToast, t.common.saved]
   );
 
   const deleteBuilding = useCallback(
@@ -419,13 +415,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           (r) => r.buildingId !== buildingId
         ),
       }));
-      syncWorkspaceAction("delete_building", { buildingId }, () => {
-        if (cloudConnected) showToast(t.common.syncErrorToast);
-      });
+      syncWorkspaceAction("delete_building", { buildingId }, handleSyncError);
       showToast(t.common.saved);
       return true;
     },
-    [cloudConnected, data.buildings, showToast, t.common.saved, t.common.syncErrorToast]
+    [data.buildings, handleSyncError, showToast, t.common.saved]
   );
 
   const updateBuildingSettings = useCallback(
@@ -454,14 +448,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
       if (target) {
-        syncWorkspaceAction("update_building", {
-          building: { ...target, ...patch },
-        });
+        syncWorkspaceAction(
+          "update_building",
+          { building: { ...target, ...patch } },
+          handleSyncError
+        );
       }
       showToast(t.settings.savedToast);
       return true;
     },
-    [data.buildings, guardWritable, showToast, t.settings.savedToast]
+    [data.buildings, guardWritable, handleSyncError, showToast, t.settings.savedToast]
   );
 
   const addApartment = useCallback(
@@ -490,11 +486,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         apartments: [...prev.apartments, apt],
       }));
-      syncWorkspaceAction("add_apartments", { apartments: [apt] });
+      syncWorkspaceAction("add_apartments", { apartments: [apt] }, handleSyncError);
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding, buildingApartments, guardWritable, showToast, t.common.saved]
+    [activeBuilding, buildingApartments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const bulkAddApartments = useCallback(
@@ -531,11 +527,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         apartments: [...prev.apartments, ...created],
       }));
-      syncWorkspaceAction("add_apartments", { apartments: created });
+      syncWorkspaceAction("add_apartments", { apartments: created }, handleSyncError);
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding, buildingApartments, guardWritable, showToast, t.common.saved]
+    [activeBuilding, buildingApartments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const importApartmentsBatch = useCallback(
@@ -570,11 +566,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         apartments: [...prev.apartments, ...created],
       }));
-      syncWorkspaceAction("add_apartments", { apartments: created });
+      syncWorkspaceAction("add_apartments", { apartments: created }, handleSyncError);
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding, buildingApartments, guardWritable, showToast, t.common.saved]
+    [activeBuilding, buildingApartments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const updateApartment = useCallback(
@@ -596,14 +592,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
       if (targetApt) {
-        syncWorkspaceAction("update_apartment", {
-          apartment: { ...targetApt, ...patch },
-        });
+        syncWorkspaceAction(
+          "update_apartment",
+          { apartment: { ...targetApt, ...patch } },
+          handleSyncError
+        );
       }
       showToast(t.common.saved);
       return true;
     },
-    [data.apartments, guardWritable, showToast, t.common.saved]
+    [data.apartments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const recordPayment = useCallback(
@@ -642,14 +640,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      syncWorkspaceAction("record_payment", { payment: newPayment }, () => {
-        if (cloudConnected) showToast(t.common.syncErrorToast);
-      });
-      void pushPaymentToCloud(newPayment);
+      syncWorkspaceAction(
+        "record_payment",
+        { payment: newPayment },
+        handleSyncError
+      );
       showToast(t.common.saved);
       return newPayment;
     },
-    [activeBuilding, cloudConnected, data.payments, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+    [activeBuilding, data.payments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const recordPaymentsBatch = useCallback(
@@ -700,16 +699,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ],
       }));
 
-      syncWorkspaceAction("record_payments_batch", { payments: created }, () => {
-        if (cloudConnected) showToast(t.common.syncErrorToast);
-      });
-      for (const p of created) {
-        void pushPaymentToCloud(p);
-      }
+      syncWorkspaceAction(
+        "record_payments_batch",
+        { payments: created },
+        handleSyncError
+      );
       showToast(t.common.saved);
       return created;
     },
-    [activeBuilding, cloudConnected, data.payments, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+    [activeBuilding, data.payments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const cancelPayment = useCallback(
@@ -719,10 +717,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         payments: prev.payments.filter((p) => p.id !== paymentId),
       }));
-      syncWorkspaceAction("cancel_payment", { paymentId });
+      syncWorkspaceAction("cancel_payment", { paymentId }, handleSyncError);
       return true;
     },
-    [guardWritable]
+    [guardWritable, handleSyncError]
   );
 
   const addExpense = useCallback(
@@ -748,12 +746,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         expenses: [exp, ...prev.expenses],
       }));
-      syncWorkspaceAction("add_expense", { expense: exp });
-      void pushExpenseToCloud(exp);
+      syncWorkspaceAction("add_expense", { expense: exp }, handleSyncError);
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding.id, guardWritable, showToast, t.common.saved, t.expenses.categories]
+    [activeBuilding.id, guardWritable, handleSyncError, showToast, t.common.saved, t.expenses.categories]
   );
 
   const deleteExpense = useCallback(
@@ -763,10 +760,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         expenses: prev.expenses.filter((e) => e.id !== expenseId),
       }));
-      syncWorkspaceAction("delete_expense", { expenseId });
+      syncWorkspaceAction("delete_expense", { expenseId }, handleSyncError);
       return true;
     },
-    [guardWritable]
+    [guardWritable, handleSyncError]
   );
 
   const submitSubscriptionRequest = useCallback(
@@ -794,11 +791,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         subscriptionRequests: [req, ...prev.subscriptionRequests],
       }));
-      syncWorkspaceAction("submit_subscription_request", { request: req });
+      syncWorkspaceAction(
+        "submit_subscription_request",
+        { request: req },
+        handleSyncError
+      );
       showToast(t.subscription.submittedMsg);
       return refCode;
     },
-    [activeBuilding.id, activeBuilding.name, showToast, t.subscription.submittedMsg]
+    [activeBuilding.id, activeBuilding.name, handleSyncError, showToast, t.subscription.submittedMsg]
   );
 
   const adminActivateBuilding = useCallback(
@@ -820,17 +821,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
       if (target) {
-        syncWorkspaceAction("update_building", {
-          building: {
-            ...target,
-            planStatus: "active",
-            planExpiresAt: expiresIso,
+        syncWorkspaceAction(
+          "update_building",
+          {
+            building: {
+              ...target,
+              planStatus: "active",
+              planExpiresAt: expiresIso,
+            },
           },
-        });
+          handleSyncError
+        );
       }
       showToast(t.common.saved);
     },
-    [data.buildings, showToast, t.common.saved]
+    [data.buildings, handleSyncError, showToast, t.common.saved]
   );
 
   const adminApproveRequest = useCallback(
@@ -856,22 +861,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
-      syncWorkspaceAction("update_subscription_request", {
-        requestId,
-        status: "approved",
-      });
+      syncWorkspaceAction(
+        "update_subscription_request",
+        { requestId, status: "approved" },
+        handleSyncError
+      );
       if (targetBuilding) {
-        syncWorkspaceAction("update_building", {
-          building: {
-            ...targetBuilding,
-            planStatus: "active",
-            planExpiresAt: expiresIso,
+        syncWorkspaceAction(
+          "update_building",
+          {
+            building: {
+              ...targetBuilding,
+              planStatus: "active",
+              planExpiresAt: expiresIso,
+            },
           },
-        });
+          handleSyncError
+        );
       }
       showToast(t.common.saved);
     },
-    [data.buildings, data.subscriptionRequests, showToast, t.common.saved]
+    [data.buildings, data.subscriptionRequests, handleSyncError, showToast, t.common.saved]
   );
 
   const adminRejectRequest = useCallback(
@@ -882,13 +892,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           r.id === requestId ? { ...r, status: "rejected" } : r
         ),
       }));
-      syncWorkspaceAction("update_subscription_request", {
-        requestId,
-        status: "rejected",
-      });
+      syncWorkspaceAction(
+        "update_subscription_request",
+        { requestId, status: "rejected" },
+        handleSyncError
+      );
       showToast(t.common.saved);
     },
-    [showToast, t.common.saved]
+    [handleSyncError, showToast, t.common.saved]
   );
 
   const adminSetBuildingExpired = useCallback(
@@ -909,18 +920,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
       if (target) {
-        syncWorkspaceAction("update_building", {
-          building: {
-            ...target,
-            planStatus: "expired",
-            trialEndsAt: pastIso,
-            planExpiresAt: pastIso,
+        syncWorkspaceAction(
+          "update_building",
+          {
+            building: {
+              ...target,
+              planStatus: "expired",
+              trialEndsAt: pastIso,
+              planExpiresAt: pastIso,
+            },
           },
-        });
+          handleSyncError
+        );
       }
       showToast(t.common.saved);
     },
-    [data.buildings, showToast, t.common.saved]
+    [data.buildings, handleSyncError, showToast, t.common.saved]
   );
 
   const adminRestoreBuildingTrial = useCallback(
@@ -943,27 +958,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
       if (target) {
-        syncWorkspaceAction("update_building", {
-          building: {
-            ...target,
-            planStatus: "trial",
-            trialEndsAt: futureIso,
-            planExpiresAt: null,
+        syncWorkspaceAction(
+          "update_building",
+          {
+            building: {
+              ...target,
+              planStatus: "trial",
+              trialEndsAt: futureIso,
+              planExpiresAt: null,
+            },
           },
-        });
+          handleSyncError
+        );
       }
       showToast(t.common.saved);
     },
-    [data.buildings, showToast, t.common.saved]
+    [data.buildings, handleSyncError, showToast, t.common.saved]
   );
 
   const resetDemoData = useCallback(() => {
     const fresh = resetDemoAppData();
     setData(fresh);
     setSelectedMonthKey(getCurrentMonthKey());
-    syncWorkspaceAction("reset_demo");
+    syncWorkspaceAction("reset_demo", {}, handleSyncError);
     showToast(t.common.saved);
-  }, [showToast, t.common.saved]);
+  }, [handleSyncError, showToast, t.common.saved]);
 
   const value = useMemo<AppContextValue>(
     () => ({

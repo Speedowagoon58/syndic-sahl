@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo, Plus_Jakarta_Sans } from "next/font/google";
 import { AppProvider } from "@/context/AppContext";
-import { APP_NAME, APP_TAGLINE_FR } from "@/lib/config";
+import { AuthProvider } from "@/components/AuthProvider";
+import { APP_NAME, APP_TAGLINE_FR, STORAGE_KEY } from "@/lib/config";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -46,6 +47,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeInitScript = `try{var r=localStorage.getItem(${JSON.stringify(
+    STORAGE_KEY
+  )});if(r){var d=JSON.parse(r);var h=document.documentElement;if(d&&d.theme==="dark"){h.classList.add("dark");}if(d&&d.locale==="ar"){h.dir="rtl";h.lang="ar";}}}catch(e){}`;
+
   return (
     <html
       lang="fr"
@@ -53,8 +58,13 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${jakarta.variable} ${cairo.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full bg-[#F6F6F4] text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100 flex flex-col transition-colors">
-        <AppProvider>{children}</AppProvider>
+        <AuthProvider>
+          <AppProvider>{children}</AppProvider>
+        </AuthProvider>
       </body>
     </html>
   );

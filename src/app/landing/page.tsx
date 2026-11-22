@@ -14,6 +14,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { AuthControls } from "@/components/AuthControls";
 import { APP_NAME, APP_NAME_AR, PLANS } from "@/lib/config";
 
 export default function LandingPage() {
@@ -38,7 +39,9 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-md border border-zinc-200 bg-white p-1.5 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+              aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
+              title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+              className="rounded-md border border-zinc-200 bg-white p-1.5 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               {theme === "dark" ? (
                 <Sun className="h-3.5 w-3.5" />
@@ -72,12 +75,9 @@ export default function LandingPage() {
               </button>
             </div>
 
-            <Link
-              href="/login"
-              className="hidden sm:inline-flex rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              {isAr ? "دخول" : "Connexion"}
-            </Link>
+            <div className="hidden sm:inline-flex">
+              <AuthControls variant="header" />
+            </div>
 
             <Link
               href="/"
@@ -345,7 +345,7 @@ export default function LandingPage() {
               {isAr ? "بوابة السكان" : "Portail résidents"}
             </Link>
             <Link
-              href="/login"
+              href="/sign-in"
               className="hover:text-zinc-900 dark:hover:text-zinc-100"
             >
               {isAr ? "دخول" : "Connexion"}
