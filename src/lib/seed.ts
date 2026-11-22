@@ -332,6 +332,7 @@ export function createSeedData(now: Date = new Date()): AppData {
 
   return {
     locale: "fr",
+    theme: "light",
     whatsappLang: "darija",
     activeBuildingId: b1Id,
     buildings,

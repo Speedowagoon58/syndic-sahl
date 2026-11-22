@@ -44,6 +44,7 @@ import type {
   PlanDuration,
   SubscriptionChannel,
   SubscriptionRequest,
+  ThemeMode,
   WhatsAppLang,
 } from "@/lib/types";
 
@@ -51,16 +52,21 @@ const emptySubscribe = () => () => {};
 
 function syncWorkspaceAction(
   action: string,
-  payload: Record<string, unknown> = {}
+  payload: Record<string, unknown> = {},
+  onError?: () => void
 ): void {
   if (typeof window === "undefined") return;
   fetch("/api/workspace", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, payload }),
-  }).catch(() => {
-    // Local persistence remains active if offline.
-  });
+  })
+    .then((res) => {
+      if (!res.ok) onError?.();
+    })
+    .catch(() => {
+      onError?.();
+    });
 }
 
 interface CreateBuildingInput {
@@ -83,6 +89,7 @@ interface AppContextValue {
   data: AppData;
   t: TranslationDict;
   locale: Locale;
+  theme: ThemeMode;
   whatsappLang: WhatsAppLang;
   activeTab: AppTab;
   selectedMonthKey: string;
@@ -95,10 +102,12 @@ interface AppContextValue {
   setActiveTab: (tab: AppTab) => void;
   setSelectedMonthKey: (monthKey: string) => void;
   setLocale: (locale: Locale) => void;
+  toggleTheme: () => void;
   setWhatsappLang: (lang: WhatsAppLang) => void;
   setActiveBuildingId: (buildingId: string) => void;
   showToast: (message: string) => void;
   createBuilding: (input: CreateBuildingInput) => Building;
+  deleteBuilding: (buildingId: string) => boolean;
   updateBuildingSettings: (
     buildingId: string,
     patch: Partial<
@@ -148,6 +157,13 @@ interface AppContextValue {
     method: PaymentMethod;
     note: string;
   }) => Payment | null;
+  recordPaymentsBatch: (input: {
+    apartmentId: string;
+    monthKeys: string[];
+    amountPerMonth: number;
+    method: PaymentMethod;
+    note: string;
+  }) => Payment[];
   cancelPayment: (paymentId: string) => boolean;
   addExpense: (input: {
     category: ExpenseCategory;
@@ -259,6 +275,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveAppData(data);
     document.documentElement.lang = data.locale;
     document.documentElement.dir = data.locale === "ar" ? "rtl" : "ltr";
+    document.documentElement.classList.toggle("dark", data.theme === "dark");
   }, [data, hydrated]);
 
   const activeBuilding = useMemo(() => {
@@ -310,6 +327,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = useCallback((locale: Locale) => {
     setData((prev) => ({ ...prev, locale }));
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setData((prev) => ({
+      ...prev,
+      theme: prev.theme === "dark" ? "light" : "dark",
+    }));
   }, []);
 
   const setWhatsappLang = useCallback((whatsappLang: WhatsAppLang) => {
@@ -368,11 +392,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       syncWorkspaceAction("create_building", {
         building: newBuilding,
         apartments: newApartments,
+      }, () => {
+        if (cloudConnected) showToast(t.common.syncErrorToast);
       });
       showToast(t.common.saved);
       return newBuilding;
     },
-    [data.buildings, showToast, t.common.saved]
+    [cloudConnected, data.buildings, showToast, t.common.saved, t.common.syncErrorToast]
+  );
+
+  const deleteBuilding = useCallback(
+    (buildingId: string): boolean => {
+      if (data.buildings.length <= 1) return false;
+      const remaining = data.buildings.filter((b) => b.id !== buildingId);
+      setData((prev) => ({
+        ...prev,
+        activeBuildingId:
+          prev.activeBuildingId === buildingId
+            ? remaining[0]?.id ?? ""
+            : prev.activeBuildingId,
+        buildings: prev.buildings.filter((b) => b.id !== buildingId),
+        apartments: prev.apartments.filter((a) => a.buildingId !== buildingId),
+        payments: prev.payments.filter((p) => p.buildingId !== buildingId),
+        expenses: prev.expenses.filter((e) => e.buildingId !== buildingId),
+        subscriptionRequests: prev.subscriptionRequests.filter(
+          (r) => r.buildingId !== buildingId
+        ),
+      }));
+      syncWorkspaceAction("delete_building", { buildingId }, () => {
+        if (cloudConnected) showToast(t.common.syncErrorToast);
+      });
+      showToast(t.common.saved);
+      return true;
+    },
+    [cloudConnected, data.buildings, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
   const updateBuildingSettings = useCallback(
@@ -589,12 +642,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      syncWorkspaceAction("record_payment", { payment: newPayment });
+      syncWorkspaceAction("record_payment", { payment: newPayment }, () => {
+        if (cloudConnected) showToast(t.common.syncErrorToast);
+      });
       void pushPaymentToCloud(newPayment);
       showToast(t.common.saved);
       return newPayment;
     },
-    [activeBuilding, data.payments, guardWritable, showToast, t.common.saved]
+    [activeBuilding, cloudConnected, data.payments, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+  );
+
+  const recordPaymentsBatch = useCallback(
+    (input: {
+      apartmentId: string;
+      monthKeys: string[];
+      amountPerMonth: number;
+      method: PaymentMethod;
+      note: string;
+    }): Payment[] => {
+      if (!guardWritable()) return [];
+      const uniqueMonths = Array.from(new Set(input.monthKeys)).sort();
+      if (uniqueMonths.length === 0) return [];
+
+      const created: Payment[] = [];
+      let virtualList = [...data.payments];
+      const nowIso = new Date().toISOString();
+
+      for (const mk of uniqueMonths) {
+        const receiptNumber = generateReceiptNumber(virtualList, mk);
+        const payment: Payment = {
+          id: createId("pay"),
+          buildingId: activeBuilding.id,
+          apartmentId: input.apartmentId,
+          monthKey: mk,
+          amount: Math.max(
+            1,
+            Number(input.amountPerMonth) || activeBuilding.defaultMonthlyFee
+          ),
+          method: input.method,
+          receiptNumber,
+          note: input.note.trim(),
+          paidAt: nowIso,
+        };
+        created.push(payment);
+        virtualList = [...virtualList, payment];
+      }
+
+      const monthSet = new Set(uniqueMonths);
+      setData((prev) => ({
+        ...prev,
+        payments: [
+          ...prev.payments.filter(
+            (p) =>
+              !(p.apartmentId === input.apartmentId && monthSet.has(p.monthKey))
+          ),
+          ...created,
+        ],
+      }));
+
+      syncWorkspaceAction("record_payments_batch", { payments: created }, () => {
+        if (cloudConnected) showToast(t.common.syncErrorToast);
+      });
+      for (const p of created) {
+        void pushPaymentToCloud(p);
+      }
+      showToast(t.common.saved);
+      return created;
+    },
+    [activeBuilding, cloudConnected, data.payments, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
   const cancelPayment = useCallback(
@@ -857,6 +972,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       data,
       t,
       locale: data.locale,
+      theme: data.theme,
       whatsappLang: data.whatsappLang,
       activeTab,
       selectedMonthKey,
@@ -869,16 +985,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setActiveTab,
       setSelectedMonthKey,
       setLocale,
+      toggleTheme,
       setWhatsappLang,
       setActiveBuildingId,
       showToast,
       createBuilding,
+      deleteBuilding,
       updateBuildingSettings,
       addApartment,
       bulkAddApartments,
       importApartmentsBatch,
       updateApartment,
       recordPayment,
+      recordPaymentsBatch,
       cancelPayment,
       addExpense,
       deleteExpense,
@@ -904,16 +1023,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       planAccess,
       toast,
       setLocale,
+      toggleTheme,
       setWhatsappLang,
       setActiveBuildingId,
       showToast,
       createBuilding,
+      deleteBuilding,
       updateBuildingSettings,
       addApartment,
       bulkAddApartments,
       importApartmentsBatch,
       updateApartment,
       recordPayment,
+      recordPaymentsBatch,
       cancelPayment,
       addExpense,
       deleteExpense,

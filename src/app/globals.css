@@ -1,8 +1,15 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #f6f6f4;
   --foreground: #09090b;
+}
+
+html.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -32,6 +39,7 @@ body {
 }
 
 @media print {
+  html.dark body,
   body {
     background: #ffffff !important;
     color: #000000 !important;
@@ -48,6 +56,8 @@ body {
   .print-sheet {
     box-shadow: none !important;
     border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;

@@ -66,16 +66,16 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-950">
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
               {t.onboarding.title}
             </h2>
             <p className="mt-0.5 text-xs text-zinc-400">
@@ -85,7 +85,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>
@@ -95,7 +95,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
           {step === 1 ? (
             <>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+                <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                   {t.settings.buildingName} *
                 </label>
                 <input
@@ -104,13 +104,13 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t.onboarding.namePlaceholder}
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     {t.settings.city}
                   </label>
                   <input
@@ -118,11 +118,11 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     placeholder={t.onboarding.cityPlaceholder}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     {t.settings.defaultFee}
                   </label>
                   <input
@@ -130,25 +130,25 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     min={0}
                     value={defaultFee}
                     onChange={(e) => setDefaultFee(Number(e.target.value))}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 tabular-nums text-sm focus:border-zinc-900 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 tabular-nums text-sm focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     {t.settings.openingBalance}
                   </label>
                   <input
                     type="number"
                     value={openingBalance}
                     onChange={(e) => setOpeningBalance(Number(e.target.value))}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 tabular-nums text-sm focus:border-zinc-900 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 tabular-nums text-sm focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     {t.settings.rib}
                   </label>
                   <input
@@ -156,7 +156,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     value={rib}
                     onChange={(e) => setRib(e.target.value)}
                     placeholder="230 780 ..."
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 font-mono text-sm focus:border-zinc-900 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 font-mono text-sm focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </div>
               </div>
@@ -165,13 +165,13 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-lg border border-zinc-200 px-3.5 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                  className="rounded-lg border border-zinc-200 px-3.5 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
                   {t.payments.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
                 >
                   {t.onboarding.nextStep}
                 </button>
@@ -181,7 +181,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     {t.onboarding.unitCountLabel}
                   </label>
                   <input
@@ -190,35 +190,35 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     max={60}
                     value={unitCount}
                     onChange={(e) => setUnitCount(Number(e.target.value))}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 tabular-nums text-sm focus:border-zinc-900 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 tabular-nums text-sm focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-700">
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     {t.onboarding.prefixLabel}
                   </label>
                   <input
                     type="text"
                     value={prefix}
                     onChange={(e) => setPrefix(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </div>
               </div>
 
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3.5">
-                <label className="flex items-center gap-2 text-xs font-medium text-zinc-800">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3.5 dark:border-zinc-800 dark:bg-zinc-950">
+                <label className="flex items-center gap-2 text-xs font-medium text-zinc-800 dark:text-zinc-200">
                   <input
                     type="checkbox"
                     checked={includeShop}
                     onChange={(e) => setIncludeShop(e.target.checked)}
-                    className="h-4 w-4 rounded accent-zinc-900"
+                    className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
                   />
                   {t.onboarding.includeShopLabel}
                 </label>
                 {includeShop && (
                   <div className="mt-2.5">
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">
+                    <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                       {t.onboarding.shopFeeLabel}
                     </label>
                     <input
@@ -226,21 +226,21 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                       min={0}
                       value={shopFee}
                       onChange={(e) => setShopFee(Number(e.target.value))}
-                      className="w-36 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 tabular-nums text-xs"
+                      className="w-36 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 tabular-nums text-xs dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                     />
                   </div>
                 )}
               </div>
 
               <div>
-                <p className="mb-1.5 text-xs font-medium text-zinc-500">
+                <p className="mb-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
                   {t.onboarding.previewTitle} ({generatedUnits.length})
                 </p>
-                <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2.5">
+                <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2.5 dark:border-zinc-800 dark:bg-zinc-950">
                   {generatedUnits.map((u) => (
                     <span
                       key={u.unitLabel}
-                      className="rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-xs font-medium text-zinc-700"
+                      className="rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
                     >
                       {u.unitLabel} ({u.monthlyFee} MAD)
                     </span>
@@ -252,13 +252,13 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="rounded-lg border border-zinc-200 px-3.5 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                  className="rounded-lg border border-zinc-200 px-3.5 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
                   {t.onboarding.back}
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
                 >
                   {t.onboarding.createBtn}
                 </button>

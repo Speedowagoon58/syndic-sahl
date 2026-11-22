@@ -1,4 +1,5 @@
 export type Locale = "fr" | "ar";
+export type ThemeMode = "light" | "dark";
 export type WhatsAppLang = "darija" | "fr" | "ar";
 export type PaymentMethod = "cash" | "virement" | "cheque";
 export type ExpenseCategory =
@@ -81,6 +82,7 @@ export interface SubscriptionRequest {
 
 export interface AppData {
   locale: Locale;
+  theme: ThemeMode;
   whatsappLang: WhatsAppLang;
   activeBuildingId: string;
   buildings: Building[];

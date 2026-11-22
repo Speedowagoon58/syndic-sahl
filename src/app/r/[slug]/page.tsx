@@ -9,8 +9,10 @@ import {
   ChevronRight,
   Eye,
   Lock,
+  Moon,
   Receipt,
   ShieldCheck,
+  Sun,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { APP_NAME, APP_NAME_AR } from "@/lib/config";
@@ -37,7 +39,7 @@ export default function PublicResidentPortalPage() {
   const params = useParams<{ slug: string }>();
   const slug = typeof params?.slug === "string" ? params.slug : "";
 
-  const { hydrated, data, locale, setLocale, t } = useApp();
+  const { hydrated, data, locale, setLocale, theme, toggleTheme, t } = useApp();
 
   const [monthKey, setMonthKey] = useState<string>(() => getCurrentMonthKey());
   const [pinInput, setPinInput] = useState("");
@@ -167,7 +169,8 @@ export default function PublicResidentPortalPage() {
     [data.buildings, slug]
   );
 
-  const building = cloudMode === "cloud" ? cloudData?.building ?? null : localBuilding;
+  const building =
+    cloudMode === "cloud" ? cloudData?.building ?? null : localBuilding;
 
   const apartments = useMemo(() => {
     if (cloudMode === "cloud") {
@@ -210,13 +213,12 @@ export default function PublicResidentPortalPage() {
 
   if (!hydrated || (cloudLoading && cloudMode === "unknown")) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400">
+      <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400 dark:bg-[#09090B]">
         {t.common.loading}
       </div>
     );
   }
 
-  // Cloud PIN Screen
   if (cloudMode === "cloud" && cloudPinRequired && !unlocked) {
     const handleCloudPinSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -224,15 +226,15 @@ export default function PublicResidentPortalPage() {
     };
 
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-4">
-        <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xs">
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-4 dark:bg-[#09090B]">
+        <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
             <Lock className="h-4 w-4" />
           </div>
-          <h1 className="mt-4 text-center text-sm font-semibold text-zinc-950">
+          <h1 className="mt-4 text-center text-sm font-semibold text-zinc-950 dark:text-zinc-100">
             {cloudPinRequired.buildingName}
           </h1>
-          <p className="mt-1 text-center text-xs text-zinc-500">
+          <p className="mt-1 text-center text-xs text-zinc-500 dark:text-zinc-400">
             {t.portal.pinDesc}
           </p>
 
@@ -245,16 +247,16 @@ export default function PublicResidentPortalPage() {
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
               placeholder={t.portal.pinPlaceholder}
-              className="w-full rounded-lg border border-zinc-200 px-4 py-2 text-center font-mono text-base tracking-widest focus:border-zinc-900 focus:outline-none"
+              className="w-full rounded-lg border border-zinc-200 px-4 py-2 text-center font-mono text-base tracking-widest focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             />
             {pinError && (
-              <p className="text-center text-xs font-medium text-red-600">
+              <p className="text-center text-xs font-medium text-red-600 dark:text-red-400">
                 {t.portal.pinError}
               </p>
             )}
             <button
               type="submit"
-              className="w-full rounded-lg bg-zinc-900 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+              className="w-full rounded-lg bg-zinc-900 py-2 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950"
             >
               {t.portal.unlockBtn}
             </button>
@@ -266,17 +268,17 @@ export default function PublicResidentPortalPage() {
 
   if (cloudNotFound || !building || !summary) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-6 text-center">
-        <div className="max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-2xs">
-          <h1 className="text-base font-semibold text-zinc-950">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-6 text-center dark:bg-[#09090B]">
+        <div className="max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
+          <h1 className="text-base font-semibold text-zinc-950 dark:text-zinc-100">
             {t.portal.notFoundTitle}
           </h1>
-          <p className="mt-1.5 text-xs text-zinc-500">
+          <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
             {t.portal.notFoundDesc}
           </p>
           <Link
             href="/"
-            className="mt-5 inline-flex rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+            className="mt-5 inline-flex rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950"
           >
             {t.portal.backHome}
           </Link>
@@ -285,7 +287,6 @@ export default function PublicResidentPortalPage() {
     );
   }
 
-  // Local Mode PIN Check
   const requiresLocalPin =
     cloudMode !== "cloud" && Boolean(building.sharePin.trim());
   if (requiresLocalPin && !unlocked) {
@@ -300,15 +301,15 @@ export default function PublicResidentPortalPage() {
     };
 
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-4">
-        <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xs">
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-4 dark:bg-[#09090B]">
+        <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
             <Lock className="h-4 w-4" />
           </div>
-          <h1 className="mt-4 text-center text-sm font-semibold text-zinc-950">
+          <h1 className="mt-4 text-center text-sm font-semibold text-zinc-950 dark:text-zinc-100">
             {building.name}
           </h1>
-          <p className="mt-1 text-center text-xs text-zinc-500">
+          <p className="mt-1 text-center text-xs text-zinc-500 dark:text-zinc-400">
             {t.portal.pinDesc}
           </p>
 
@@ -321,16 +322,16 @@ export default function PublicResidentPortalPage() {
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
               placeholder={t.portal.pinPlaceholder}
-              className="w-full rounded-lg border border-zinc-200 px-4 py-2 text-center font-mono text-base tracking-widest focus:border-zinc-900 focus:outline-none"
+              className="w-full rounded-lg border border-zinc-200 px-4 py-2 text-center font-mono text-base tracking-widest focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             />
             {pinError && (
-              <p className="text-center text-xs font-medium text-red-600">
+              <p className="text-center text-xs font-medium text-red-600 dark:text-red-400">
                 {t.portal.pinError}
               </p>
             )}
             <button
               type="submit"
-              className="w-full rounded-lg bg-zinc-900 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+              className="w-full rounded-lg bg-zinc-900 py-2 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950"
             >
               {t.portal.unlockBtn}
             </button>
@@ -352,20 +353,19 @@ export default function PublicResidentPortalPage() {
       : 0;
 
   return (
-    <div className="min-h-screen bg-[#F6F6F4] pb-12 text-zinc-950">
-      {/* Top Bar */}
-      <header className="border-b border-zinc-200/80 bg-white">
+    <div className="min-h-screen bg-[#F6F6F4] pb-12 text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100">
+      <header className="border-b border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-[#111113]">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-xs font-bold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-xs font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
               S
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold text-zinc-950">
+                <h1 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
                   {building.name}
                 </h1>
-                <span className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium text-zinc-600">
+                <span className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
                   {t.portal.badge}
                 </span>
               </div>
@@ -373,41 +373,54 @@ export default function PublicResidentPortalPage() {
             </div>
           </div>
 
-          <div className="inline-flex rounded-md border border-zinc-200 bg-zinc-100/80 p-0.5 text-xs font-medium">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setLocale("fr")}
-              className={`rounded-xs px-2.5 py-0.5 ${
-                locale === "fr"
-                  ? "bg-white text-zinc-950 shadow-2xs"
-                  : "text-zinc-500"
-              }`}
+              onClick={toggleTheme}
+              className="rounded-md border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
             >
-              FR
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
             </button>
-            <button
-              type="button"
-              onClick={() => setLocale("ar")}
-              className={`rounded-xs px-2.5 py-0.5 ${
-                locale === "ar"
-                  ? "bg-white text-zinc-950 shadow-2xs"
-                  : "text-zinc-500"
-              }`}
-            >
-              العربية
-            </button>
+
+            <div className="inline-flex rounded-md border border-zinc-200 bg-zinc-100/80 p-0.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900">
+              <button
+                type="button"
+                onClick={() => setLocale("fr")}
+                className={`rounded-xs px-2.5 py-0.5 ${
+                  locale === "fr"
+                    ? "bg-white text-zinc-950 shadow-2xs dark:bg-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 dark:text-zinc-400"
+                }`}
+              >
+                FR
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocale("ar")}
+                className={`rounded-xs px-2.5 py-0.5 ${
+                  locale === "ar"
+                    ? "bg-white text-zinc-950 shadow-2xs dark:bg-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 dark:text-zinc-400"
+                }`}
+              >
+                العربية
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl space-y-6 px-4 pt-6 sm:px-6">
-        {/* Unified Financial Strip */}
-        <div className="grid grid-cols-1 divide-y divide-zinc-200/80 overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
+        <div className="grid grid-cols-1 divide-y divide-zinc-200/80 overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:divide-zinc-800 dark:border-zinc-800 dark:bg-[#111113] sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
           <div className="p-5">
             <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-400">
               {t.kpi.treasuryBalance}
             </span>
-            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950">
+            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
               {formatMAD(summary.currentBalance, locale)}
             </p>
             <p className="mt-1 tabular-nums text-xs text-zinc-400">
@@ -420,15 +433,15 @@ export default function PublicResidentPortalPage() {
               <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-400">
                 {t.kpi.collectedMonth}
               </span>
-              <span className="tabular-nums text-xs font-semibold text-emerald-700">
+              <span className="tabular-nums text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                 {collectionPct}%
               </span>
             </div>
-            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950">
+            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
               {formatMAD(summary.monthCollected, locale)}
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                 <div
                   className="h-full rounded-full bg-emerald-600"
                   style={{ width: `${collectionPct}%` }}
@@ -444,7 +457,7 @@ export default function PublicResidentPortalPage() {
             <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-400">
               {t.expenses.totalAllTime}
             </span>
-            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950">
+            <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
               {formatMAD(summary.totalExpensesAllTime, locale)}
             </p>
             <p className="mt-1 text-xs text-zinc-400">
@@ -453,27 +466,26 @@ export default function PublicResidentPortalPage() {
           </div>
         </div>
 
-        {/* Apartments Status Grid */}
-        <div className="rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 pb-4">
-            <h2 className="text-sm font-semibold text-zinc-950">
+        <div className="rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
               {t.payments.title}
             </h2>
-            <div className="inline-flex items-center rounded-lg border border-zinc-200/90 bg-white p-0.5">
+            <div className="inline-flex items-center rounded-lg border border-zinc-200/90 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
               <button
                 type="button"
                 onClick={() => setMonthKey(shiftMonthKey(monthKey, -1))}
-                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100"
+                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="min-w-32 px-2 text-center text-xs font-semibold text-zinc-900">
+              <span className="min-w-32 px-2 text-center text-xs font-semibold text-zinc-900 dark:text-zinc-100">
                 {formatMonthLabel(monthKey, locale)}
               </span>
               <button
                 type="button"
                 onClick={() => setMonthKey(shiftMonthKey(monthKey, 1))}
-                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100"
+                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -492,10 +504,10 @@ export default function PublicResidentPortalPage() {
               return (
                 <div
                   key={apt.id}
-                  className="rounded-lg border border-zinc-200/80 bg-zinc-50/40 p-3"
+                  className="rounded-lg border border-zinc-200/80 bg-zinc-50/40 p-3 dark:border-zinc-800 dark:bg-zinc-900/50"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-zinc-900">
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
                       {apt.unitLabel}
                     </span>
                     <span
@@ -505,13 +517,15 @@ export default function PublicResidentPortalPage() {
                     />
                   </div>
                   {building.showNamesPublicly && apt.residentName && (
-                    <p className="mt-1 truncate text-xs text-zinc-500">
+                    <p className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400">
                       {apt.residentName}
                     </p>
                   )}
                   <p
                     className={`mt-1 text-[11px] font-medium ${
-                      isPaid ? "text-emerald-700" : "text-red-600"
+                      isPaid
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
                     }`}
                   >
                     {isPaid
@@ -531,10 +545,9 @@ export default function PublicResidentPortalPage() {
           </p>
         </div>
 
-        {/* Expenses & Receipt Photos Table */}
-        <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
-          <div className="border-b border-zinc-100 px-5 py-4">
-            <h2 className="text-sm font-semibold text-zinc-950">
+        <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
               {t.portal.expensesFeed}
             </h2>
             <p className="text-xs text-zinc-400">{t.portal.tapPhoto}</p>
@@ -545,11 +558,11 @@ export default function PublicResidentPortalPage() {
               {t.expenses.noExpenses}
             </p>
           ) : (
-            <div className="divide-y divide-zinc-100">
+            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {expenses.map((exp) => (
                 <div
                   key={exp.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 hover:bg-zinc-50/70"
+                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/50"
                 >
                   <div className="flex items-center gap-3">
                     {exp.receiptPhotoUrl ? (
@@ -561,7 +574,7 @@ export default function PublicResidentPortalPage() {
                             caption: exp.description,
                           })
                         }
-                        className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100"
+                        className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700"
                       >
                         <Image
                           src={exp.receiptPhotoUrl}
@@ -573,12 +586,12 @@ export default function PublicResidentPortalPage() {
                         />
                       </button>
                     ) : (
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-400">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-400 dark:bg-zinc-800">
                         <Receipt className="h-4 w-4" />
                       </div>
                     )}
                     <div>
-                      <p className="text-sm font-medium text-zinc-900">
+                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {exp.description}
                       </p>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
@@ -592,7 +605,7 @@ export default function PublicResidentPortalPage() {
                   </div>
 
                   <div className="flex items-center gap-2.5">
-                    <span className="tabular-nums text-sm font-semibold text-zinc-900">
+                    <span className="tabular-nums text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                       -{formatMAD(exp.amount, locale)}
                     </span>
                     {exp.receiptPhotoUrl && (
@@ -604,7 +617,7 @@ export default function PublicResidentPortalPage() {
                             caption: exp.description,
                           })
                         }
-                        className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                       >
                         <Eye className="h-3 w-3 text-zinc-400" />
                         <span>{t.expenses.viewPhoto}</span>
@@ -617,17 +630,16 @@ export default function PublicResidentPortalPage() {
           )}
         </div>
 
-        {/* Minimal Footer CTA */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200/90 bg-white px-5 py-4 text-xs">
-          <span className="text-zinc-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200/90 bg-white px-5 py-4 text-xs dark:border-zinc-800 dark:bg-[#111113]">
+          <span className="text-zinc-500 dark:text-zinc-400">
             {t.portal.poweredBy}{" "}
-            <strong className="font-semibold text-zinc-900">
+            <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
               {locale === "ar" ? APP_NAME_AR : APP_NAME}
             </strong>
           </span>
           <Link
             href="/"
-            className="font-medium text-zinc-900 underline hover:text-zinc-600"
+            className="font-medium text-zinc-900 underline hover:text-zinc-600 dark:text-zinc-100 dark:hover:text-zinc-300"
           >
             {t.portal.tryFree} →
           </Link>

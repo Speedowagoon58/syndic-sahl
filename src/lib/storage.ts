@@ -21,6 +21,7 @@ export function loadAppData(): AppData {
     }
     return {
       locale: parsed.locale === "ar" ? "ar" : "fr",
+      theme: parsed.theme === "dark" ? "dark" : "light",
       whatsappLang:
         parsed.whatsappLang === "fr" || parsed.whatsappLang === "ar"
           ? parsed.whatsappLang

@@ -206,6 +206,28 @@ export async function POST(request: Request) {
           note = excluded.note,
           paid_at = excluded.paid_at
       `;
+    } else if (action === "record_payments_batch") {
+      const list = (payload.payments as Payment[]) ?? [];
+      for (const p of list) {
+        await sql`
+          insert into syndic_payments (
+            id, building_id, apartment_id, month_key, amount, method, receipt_number, note, paid_at
+          ) values (
+            ${p.id}, ${p.buildingId}, ${p.apartmentId}, ${p.monthKey}, ${p.amount},
+            ${p.method}, ${p.receiptNumber}, ${p.note}, ${p.paidAt}
+          )
+          on conflict (apartment_id, month_key) do update set
+            id = excluded.id,
+            amount = excluded.amount,
+            method = excluded.method,
+            receipt_number = excluded.receipt_number,
+            note = excluded.note,
+            paid_at = excluded.paid_at
+        `;
+      }
+    } else if (action === "delete_building") {
+      const buildingId = String(payload.buildingId ?? "");
+      await sql`delete from syndic_buildings where id = ${buildingId}`;
     } else if (action === "cancel_payment") {
       const paymentId = String(payload.paymentId ?? "");
       await sql`delete from syndic_payments where id = ${paymentId}`;

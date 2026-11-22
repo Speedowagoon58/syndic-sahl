@@ -33,7 +33,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0F766E",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F6F6F4" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
@@ -47,9 +50,10 @@ export default function RootLayout({
     <html
       lang="fr"
       dir="ltr"
+      suppressHydrationWarning
       className={`${jakarta.variable} ${cairo.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-slate-50 text-slate-900 flex flex-col">
+      <body className="min-h-full bg-[#F6F6F4] text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100 flex flex-col transition-colors">
         <AppProvider>{children}</AppProvider>
       </body>
     </html>
