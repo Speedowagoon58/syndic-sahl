@@ -658,6 +658,16 @@ export default function PublicResidentPortalPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {(cloudMode !== "cloud" ||
+              cloudData?.viewerRole === "syndic" ||
+              cloudData?.viewerRole === "assistant") && (
+              <Link
+                href="/"
+                className="inline-flex items-center rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                {t.portal.manageBtn}
+              </Link>
+            )}
             <AuthControls variant="header" />
             <button
               type="button"
@@ -822,7 +832,7 @@ export default function PublicResidentPortalPage() {
                         {formatMAD(p.amount, locale)}
                       </span>
                       <Link
-                        href={`/receipt/${p.id}`}
+                        href={`/receipt/${p.id}?from=portal`}
                         className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                       >
                         <FileText className="h-3 w-3 text-zinc-400" />
@@ -973,7 +983,7 @@ export default function PublicResidentPortalPage() {
                     </p>
                     {canViewReceipt && monthPayment && (
                       <Link
-                        href={`/receipt/${monthPayment.id}`}
+                        href={`/receipt/${monthPayment.id}?from=portal`}
                         className="text-[10px] font-semibold text-zinc-700 underline hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-zinc-100"
                       >
                         {t.portal.viewReceiptPdf}

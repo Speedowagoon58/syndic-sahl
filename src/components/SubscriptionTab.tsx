@@ -124,7 +124,7 @@ export function SubscriptionTab() {
           </div>
           <div className="mt-6 border-t border-zinc-100 pt-3 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
             {activeUnits <= 8
-              ? "Actif pour cet immeuble"
+              ? t.subscription.activeForBuilding
               : `${activeUnits} ${t.header.lotActivePlural}`}
           </div>
         </div>

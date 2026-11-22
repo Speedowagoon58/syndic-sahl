@@ -22,6 +22,13 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ slug: string }> }
 ) {
+  const clerkActive = isClerkServerConfigured();
+  const identity = clerkActive ? await getAuthenticatedClerkIdentity() : null;
+
+  if (clerkActive && !identity) {
+    return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  }
+
   const { slug } = await context.params;
   const sql = getSql();
 
@@ -53,13 +60,6 @@ export async function POST(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     const buildingId = String(building.id);
-
-    const clerkActive = isClerkServerConfigured();
-    const identity = clerkActive ? await getAuthenticatedClerkIdentity() : null;
-
-    if (clerkActive && !identity) {
-      return NextResponse.json({ error: "auth_required" }, { status: 401 });
-    }
 
     let apartmentId: string | null = null;
     let roleLabel: string = "tenant";

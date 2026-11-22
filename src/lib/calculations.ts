@@ -76,6 +76,20 @@ export function formatDateShort(isoDate: string, locale: Locale): string {
   }).format(parsed);
 }
 
+export function formatDateTimeShort(isoDate: string, locale: Locale): string {
+  if (!isoDate) return "";
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar-MA" : "fr-MA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed);
+}
+
 export function computeApartmentArrears(
   apartment: Apartment,
   payments: Payment[],

@@ -298,7 +298,11 @@ export function ExpensesTab() {
                     <td className="py-3 ps-3 pe-4 text-end whitespace-nowrap">
                       <button
                         type="button"
-                        onClick={() => deleteExpense(exp.id)}
+                        onClick={() => {
+                          if (window.confirm(t.expenses.confirmDelete)) {
+                            deleteExpense(exp.id);
+                          }
+                        }}
                         title={t.expenses.deleteExpense}
                         aria-label={t.expenses.deleteExpense}
                         className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400"

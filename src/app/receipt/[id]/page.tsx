@@ -11,12 +11,13 @@ import {
   formatMAD,
   formatMonthLabel,
 } from "@/lib/calculations";
-import type { Payment } from "@/lib/types";
+import type { MemberRole, Payment } from "@/lib/types";
 
 interface CloudReceiptPayload {
   payment: Payment;
-  building: { id: string; name: string; city: string };
+  building: { id: string; name: string; city: string; shareSlug?: string };
   apartment: { id: string; unitLabel: string; residentName: string };
+  viewerRole?: MemberRole;
 }
 
 export default function ReceiptPage() {
@@ -69,6 +70,7 @@ export default function ReceiptPage() {
             payment: json.payment,
             building: json.building,
             apartment: json.apartment,
+            viewerRole: json.viewerRole,
           });
         }
         setCloudLoading(false);
@@ -168,16 +170,26 @@ export default function ReceiptPage() {
     );
   }
 
+  const fromPortal =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("from") === "portal";
+  const isPortalReturn =
+    Boolean(building.shareSlug) &&
+    (fromPortal ||
+      (cloudMode === "cloud" && cloudReceipt?.viewerRole === "tenant"));
+  const backHref = isPortalReturn ? `/r/${building.shareSlug}` : "/";
+  const backLabel = isPortalReturn ? t.receipt.backToPortal : t.receipt.backBtn;
+
   return (
     <div className="min-h-screen bg-[#F6F6F4] py-8 px-4 text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100">
       {/* Action Bar */}
       <div className="no-print mx-auto mb-6 flex max-w-xl items-center justify-between">
         <Link
-          href="/"
+          href={backHref}
           className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          {t.receipt.backBtn}
+          {backLabel}
         </Link>
         <div className="flex items-center gap-2">
           <button

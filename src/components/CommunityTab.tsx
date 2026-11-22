@@ -72,8 +72,12 @@ function TicketManageCard({
   const [adminNote, setAdminNote] = useState(ticket.adminNote);
   const [busy, setBusy] = useState(false);
 
+  const isDirty =
+    status !== ticket.status || adminNote.trim() !== ticket.adminNote.trim();
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isDirty) return;
     setBusy(true);
     await updateTicketStatus({ ticketId: ticket.id, status, adminNote });
     setBusy(false);
@@ -189,7 +193,7 @@ function TicketManageCard({
         />
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || !isDirty}
           className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 sm:col-span-2"
         >
           {t.community.saveStatusBtn}
@@ -233,6 +237,23 @@ export function CommunityTab() {
     url: string;
     caption: string;
   } | null>(null);
+
+  const ticketCounts = useMemo(() => {
+    let open = 0;
+    let inProgress = 0;
+    let resolved = 0;
+    for (const item of buildingTickets) {
+      if (item.status === "open") open += 1;
+      else if (item.status === "in_progress") inProgress += 1;
+      else resolved += 1;
+    }
+    return {
+      all: buildingTickets.length,
+      open,
+      in_progress: inProgress,
+      resolved,
+    };
+  }, [buildingTickets]);
 
   const filteredTickets = useMemo(() => {
     if (ticketFilter === "all") return buildingTickets;
@@ -494,10 +515,12 @@ export function CommunityTab() {
                       : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
                   }`}
                 >
-                  {f === "all" && t.community.filterAll}
-                  {f === "open" && t.community.filterOpen}
-                  {f === "in_progress" && t.community.filterInProgress}
-                  {f === "resolved" && t.community.filterResolved}
+                  {f === "all" && `${t.community.filterAll} (${ticketCounts.all})`}
+                  {f === "open" && `${t.community.filterOpen} (${ticketCounts.open})`}
+                  {f === "in_progress" &&
+                    `${t.community.filterInProgress} (${ticketCounts.in_progress})`}
+                  {f === "resolved" &&
+                    `${t.community.filterResolved} (${ticketCounts.resolved})`}
                 </button>
               ))}
             </div>
@@ -622,7 +645,7 @@ export function CommunityTab() {
           <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {filteredTickets.map((ticket) => (
               <TicketManageCard
-                key={ticket.id}
+                key={`${ticket.id}-${ticket.updatedAt}`}
                 ticket={ticket}
                 onOpenLightbox={(url, caption) => setLightbox({ url, caption })}
               />

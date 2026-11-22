@@ -13,6 +13,7 @@ import {
   Layers,
   MessageCircle,
   Plus,
+  RefreshCw,
   RotateCcw,
   Save,
   Shield,
@@ -23,7 +24,7 @@ import {
 import { useApp } from "@/context/AppContext";
 import {
   computeBuildingSummary,
-  formatDateShort,
+  formatDateTimeShort,
   normalizeBillingCycle,
 } from "@/lib/calculations";
 import {
@@ -117,6 +118,7 @@ export function SettingsTab() {
     adminSetBuildingExpired,
     adminRestoreBuildingTrial,
     resetDemoData,
+    refreshWorkspace,
     showToast,
   } = useApp();
 
@@ -972,12 +974,40 @@ export function SettingsTab() {
                           </span>
                         )}
                       </div>
-                      <p className="truncate font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+                      <p
+                        dir="ltr"
+                        className="truncate text-start font-mono text-[11px] text-zinc-400 dark:text-zinc-500"
+                      >
                         {m.email}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5">
+                      {(activeBuildingRole === "syndic" ||
+                        (activeBuildingRole === "assistant" && m.role === "tenant")) &&
+                        m.role !== "syndic" && (
+                          <select
+                            aria-label={t.settings.inviteUnitLabel}
+                            value={m.apartmentId ?? ""}
+                            onChange={(e) =>
+                              void updateMemberRole({
+                                membershipId: m.id,
+                                role:
+                                  m.role === "assistant" ? "assistant" : "tenant",
+                                apartmentId: e.target.value || null,
+                              })
+                            }
+                            className="max-w-36 truncate rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                          >
+                            <option value="">{t.settings.inviteNoUnitOption}</option>
+                            {buildingApartments.map((apt) => (
+                              <option key={apt.id} value={apt.id}>
+                                {apt.unitLabel}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
                       {activeBuildingRole === "syndic" && m.role !== "syndic" && (
                         <select
                           aria-label={t.settings.inviteRoleLabel}
@@ -1150,14 +1180,26 @@ export function SettingsTab() {
       {/* 3.7 Activity / Audit Log */}
       {(activeBuildingRole === "syndic" || activeBuildingRole === "assistant") && (
         <div className="rounded-xl border border-zinc-200/90 bg-white p-6 shadow-2xs space-y-4 dark:border-zinc-800 dark:bg-[#111113]">
-          <div className="border-b border-zinc-100 pb-4 dark:border-zinc-800">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-zinc-100">
-              <History className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
-              <span>{t.settings.auditLogTitle}</span>
-            </h2>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {t.settings.auditLogDesc}
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+                <History className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                <span>{t.settings.auditLogTitle}</span>
+              </h2>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                {t.settings.auditLogDesc}
+              </p>
+            </div>
+            {cloudConnected && (
+              <button
+                type="button"
+                onClick={() => void refreshWorkspace()}
+                className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <RefreshCw className="h-3 w-3" />
+                <span>{t.settings.refreshAuditLog}</span>
+              </button>
+            )}
           </div>
 
           {buildingAuditLogs.length === 0 ? (
@@ -1166,30 +1208,36 @@ export function SettingsTab() {
             </p>
           ) : (
             <div className="max-h-72 divide-y divide-zinc-100 overflow-y-auto rounded-lg border border-zinc-200/90 dark:divide-zinc-800 dark:border-zinc-800">
-              {buildingAuditLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-                        {log.action}
-                      </span>
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {log.summary}
-                      </span>
+              {buildingAuditLogs.map((log) => {
+                const actionLabel =
+                  t.settings.auditActions[
+                    log.action as keyof typeof t.settings.auditActions
+                  ] ?? log.action;
+                return (
+                  <div
+                    key={log.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                          {actionLabel}
+                        </span>
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                          {log.summary}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                        {log.actorName || log.actorEmail} •{" "}
+                        {t.header.roleBadge[log.actorRole]}
+                      </p>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                      {log.actorName || log.actorEmail} •{" "}
-                      {t.header.roleBadge[log.actorRole]}
-                    </p>
+                    <span className="tabular-nums text-[11px] text-zinc-400">
+                      {formatDateTimeShort(log.createdAt, locale)}
+                    </span>
                   </div>
-                  <span className="tabular-nums text-[11px] text-zinc-400">
-                    {formatDateShort(log.createdAt, locale)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

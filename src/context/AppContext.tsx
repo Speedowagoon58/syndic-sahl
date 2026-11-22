@@ -494,6 +494,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (cloudConnected) showToast(t.common.syncErrorToast);
   }, [cloudConnected, showToast, t.common.syncErrorToast]);
 
+  const appendAuditEntry = useCallback(
+    (buildingId: string, action: string, summary: string, role?: MemberRole) => {
+      const entry: AuditLogEntry = {
+        id: createId("aud"),
+        buildingId,
+        actorUserId: null,
+        actorName: t.header.roleBadge[role ?? activeBuildingRole],
+        actorEmail: "",
+        actorRole: role ?? activeBuildingRole,
+        action,
+        summary,
+        createdAt: new Date().toISOString(),
+      };
+      setData((prev) => ({
+        ...prev,
+        auditLogs: [entry, ...(prev.auditLogs ?? [])].slice(0, 150),
+      }));
+    },
+    [activeBuildingRole, t.header.roleBadge]
+  );
+
   const guardWritable = useCallback((): boolean => {
     if (!hasBuildings) return false;
     if (activeBuildingRole === "tenant") return false;
@@ -573,16 +594,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           [buildingId]: "syndic",
         },
       }));
-
-      syncWorkspaceAction(
+      appendAuditEntry(
+        buildingId,
         "create_building",
-        { building: newBuilding, apartments: newApartments },
-        handleSyncError
+        `${newBuilding.name} (${newApartments.length} lots)`,
+        "syndic"
       );
+
+      if (typeof window !== "undefined") {
+        fetch("/api/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create_building",
+            payload: { building: newBuilding, apartments: newApartments },
+          }),
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              handleSyncError();
+              return;
+            }
+            const json = (await res.json()) as { shareSlug?: string };
+            if (json.shareSlug && json.shareSlug !== newBuilding.shareSlug) {
+              setData((prev) => ({
+                ...prev,
+                buildings: prev.buildings.map((b) =>
+                  b.id === buildingId ? { ...b, shareSlug: json.shareSlug! } : b
+                ),
+              }));
+            }
+          })
+          .catch(() => {
+            handleSyncError();
+          });
+      }
       showToast(t.common.saved);
       return newBuilding;
     },
-    [data.buildings, handleSyncError, showToast, t.common.saved]
+    [appendAuditEntry, data.buildings, handleSyncError, showToast, t.common.saved]
   );
 
   const deleteBuilding = useCallback(
@@ -661,11 +711,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { building: { ...target, ...patch } },
           handleSyncError
         );
+        appendAuditEntry(buildingId, "update_building", patch.name ?? target.name);
       }
       showToast(t.settings.savedToast);
       return true;
     },
-    [data.buildings, guardWritable, handleSyncError, showToast, t.settings.savedToast]
+    [appendAuditEntry, data.buildings, guardWritable, handleSyncError, showToast, t.settings.savedToast]
   );
 
   const addApartment = useCallback(
@@ -697,10 +748,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apartments: [...prev.apartments, apt],
       }));
       syncWorkspaceAction("add_apartments", { apartments: [apt] }, handleSyncError);
+      appendAuditEntry(activeBuilding.id, "add_apartments", apt.unitLabel);
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding, buildingApartments, guardWritable, handleSyncError, showToast, t.common.saved]
+    [activeBuilding, appendAuditEntry, buildingApartments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const bulkAddApartments = useCallback(
@@ -858,10 +910,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { payment: newPayment },
         handleSyncError
       );
+      appendAuditEntry(
+        activeBuilding.id,
+        "record_payment",
+        `${newPayment.receiptNumber} • ${newPayment.monthKey} (${newPayment.amount} MAD)`
+      );
       showToast(t.common.saved);
       return newPayment;
     },
-    [activeBuilding, data.payments, guardWritable, handleSyncError, showToast, t.common.saved]
+    [activeBuilding, appendAuditEntry, data.payments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const recordPaymentsBatch = useCallback(
@@ -917,23 +974,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { payments: created },
         handleSyncError
       );
+      const totalBatch = created.reduce((sum, p) => sum + p.amount, 0);
+      appendAuditEntry(
+        activeBuilding.id,
+        "record_payments_batch",
+        `${created.length} mois (${totalBatch} MAD)`
+      );
       showToast(t.common.saved);
       return created;
     },
-    [activeBuilding, data.payments, guardWritable, handleSyncError, showToast, t.common.saved]
+    [activeBuilding, appendAuditEntry, data.payments, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const cancelPayment = useCallback(
     (paymentId: string): boolean => {
       if (!guardWritable()) return false;
+      const target = data.payments.find((p) => p.id === paymentId);
       setData((prev) => ({
         ...prev,
         payments: prev.payments.filter((p) => p.id !== paymentId),
       }));
       syncWorkspaceAction("cancel_payment", { paymentId }, handleSyncError);
+      if (target) {
+        appendAuditEntry(
+          target.buildingId,
+          "cancel_payment",
+          `${target.receiptNumber} (${target.monthKey})`
+        );
+      }
       return true;
     },
-    [guardWritable, handleSyncError]
+    [appendAuditEntry, data.payments, guardWritable, handleSyncError]
   );
 
   const addExpense = useCallback(
@@ -960,23 +1031,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         expenses: [exp, ...prev.expenses],
       }));
       syncWorkspaceAction("add_expense", { expense: exp }, handleSyncError);
+      appendAuditEntry(
+        activeBuilding.id,
+        "add_expense",
+        `${exp.description} (${exp.amount} MAD)`
+      );
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding.id, guardWritable, handleSyncError, showToast, t.common.saved, t.expenses.categories]
+    [activeBuilding.id, appendAuditEntry, guardWritable, handleSyncError, showToast, t.common.saved, t.expenses.categories]
   );
 
   const deleteExpense = useCallback(
     (expenseId: string): boolean => {
       if (!guardWritable()) return false;
+      const target = data.expenses.find((e) => e.id === expenseId);
       setData((prev) => ({
         ...prev,
         expenses: prev.expenses.filter((e) => e.id !== expenseId),
       }));
       syncWorkspaceAction("delete_expense", { expenseId }, handleSyncError);
+      if (target) {
+        appendAuditEntry(
+          target.buildingId,
+          "delete_expense",
+          `${target.description} (${target.amount} MAD)`
+        );
+      }
       return true;
     },
-    [guardWritable, handleSyncError]
+    [appendAuditEntry, data.expenses, guardWritable, handleSyncError]
   );
 
   const submitSubscriptionRequest = useCallback(
@@ -1222,6 +1306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               created,
             ],
           }));
+          appendAuditEntry(input.buildingId, "invite_member", `${email} (${input.role})`);
           showToast(t.settings.inviteCreatedToast);
           return created;
         }
@@ -1254,10 +1339,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           localMember,
         ],
       }));
+      appendAuditEntry(input.buildingId, "invite_member", `${email} (${input.role})`);
       showToast(t.settings.inviteCreatedToast);
       return localMember;
     },
-    [cloudConnected, guardWritable, showToast, t.common.syncErrorToast, t.settings.inviteCreatedToast]
+    [appendAuditEntry, cloudConnected, guardWritable, showToast, t.common.syncErrorToast, t.settings.inviteCreatedToast]
   );
 
   const updateMemberRole = useCallback(
@@ -1267,6 +1353,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       apartmentId?: string | null;
     }): Promise<boolean> => {
       if (!guardWritable()) return false;
+      const target = (data.memberships ?? []).find(
+        (m) => m.id === input.membershipId
+      );
       try {
         if (cloudConnected) {
           const res = await fetch("/api/workspace", {
@@ -1302,15 +1391,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : m
         ),
       }));
+      if (target) {
+        appendAuditEntry(
+          target.buildingId,
+          "update_member_role",
+          `${target.email} -> ${input.role}`
+        );
+      }
       showToast(t.common.saved);
       return true;
     },
-    [cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+    [appendAuditEntry, cloudConnected, data.memberships, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
   const revokeMember = useCallback(
     async (membershipId: string): Promise<boolean> => {
       if (!guardWritable()) return false;
+      const target = (data.memberships ?? []).find((m) => m.id === membershipId);
       try {
         if (cloudConnected) {
           const res = await fetch("/api/workspace", {
@@ -1337,10 +1434,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           (m) => m.id !== membershipId
         ),
       }));
+      if (target) {
+        appendAuditEntry(target.buildingId, "revoke_member", target.email);
+      }
       showToast(t.common.saved);
       return true;
     },
-    [cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+    [appendAuditEntry, cloudConnected, data.memberships, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
   const transferOwnership = useCallback(
@@ -1430,6 +1530,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             announcements: [created, ...(prev.announcements ?? [])],
           }));
+          appendAuditEntry(
+            activeBuilding.id,
+            "create_announcement",
+            `${created.title} (${created.category})`
+          );
           showToast(t.common.saved);
           return true;
         } catch {
@@ -1442,10 +1547,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         announcements: [ann, ...(prev.announcements ?? [])],
       }));
+      appendAuditEntry(
+        activeBuilding.id,
+        "create_announcement",
+        `${ann.title} (${ann.category})`
+      );
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding.id, cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+    [activeBuilding.id, appendAuditEntry, cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
   const toggleAnnouncementPin = useCallback(
@@ -1470,6 +1580,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteAnnouncement = useCallback(
     (announcementId: string) => {
       if (!guardWritable()) return;
+      const target = (data.announcements ?? []).find((a) => a.id === announcementId);
       setData((prev) => ({
         ...prev,
         announcements: (prev.announcements ?? []).filter(
@@ -1481,9 +1592,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { announcementId },
         handleSyncError
       );
+      if (target) {
+        appendAuditEntry(target.buildingId, "delete_announcement", target.title);
+      }
       showToast(t.common.saved);
     },
-    [guardWritable, handleSyncError, showToast, t.common.saved]
+    [appendAuditEntry, data.announcements, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const createTicket = useCallback(
@@ -1531,6 +1645,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             tickets: [created, ...(prev.tickets ?? [])],
           }));
+          appendAuditEntry(activeBuilding.id, "create_ticket", created.title);
           showToast(t.common.saved);
           return true;
         } catch {
@@ -1543,10 +1658,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         tickets: [ticket, ...(prev.tickets ?? [])],
       }));
+      appendAuditEntry(activeBuilding.id, "create_ticket", ticket.title);
       showToast(t.common.saved);
       return true;
     },
-    [activeBuilding.id, cloudConnected, hasBuildings, showToast, t.common.saved, t.common.syncErrorToast]
+    [activeBuilding.id, appendAuditEntry, cloudConnected, hasBuildings, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
   const updateTicketStatus = useCallback(
@@ -1557,6 +1673,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }): Promise<boolean> => {
       if (!guardWritable()) return false;
       const nowIso = new Date().toISOString();
+      const target = (data.tickets ?? []).find((tkt) => tkt.id === input.ticketId);
       if (cloudConnected) {
         try {
           const res = await fetch("/api/workspace", {
@@ -1590,23 +1707,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : tkt
         ),
       }));
+      if (target) {
+        appendAuditEntry(
+          target.buildingId,
+          "update_ticket_status",
+          `${target.title} -> ${input.status}`
+        );
+      }
       showToast(t.common.saved);
       return true;
     },
-    [cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+    [appendAuditEntry, cloudConnected, data.tickets, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
   );
 
   const deleteTicket = useCallback(
     (ticketId: string) => {
       if (!guardWritable()) return;
+      const target = (data.tickets ?? []).find((tkt) => tkt.id === ticketId);
       setData((prev) => ({
         ...prev,
         tickets: (prev.tickets ?? []).filter((tkt) => tkt.id !== ticketId),
       }));
       syncWorkspaceAction("delete_ticket", { ticketId }, handleSyncError);
+      if (target) {
+        appendAuditEntry(target.buildingId, "delete_ticket", target.title);
+      }
       showToast(t.common.saved);
     },
-    [guardWritable, handleSyncError, showToast, t.common.saved]
+    [appendAuditEntry, data.tickets, guardWritable, handleSyncError, showToast, t.common.saved]
   );
 
   const resetDemoData = useCallback(() => {

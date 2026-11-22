@@ -89,8 +89,21 @@ function isPositiveFinite(val: unknown): val is number {
   return Number.isFinite(n) && n > 0;
 }
 
+function isNonNegativeFinite(val: unknown): boolean {
+  const n = Number(val);
+  return Number.isFinite(n) && n >= 0;
+}
+
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidOptionalImageDataUrl(val: unknown): boolean {
+  if (val == null || val === "") return true;
+  if (typeof val !== "string") return false;
+  const trimmed = val.trim();
+  if (!trimmed) return true;
+  return trimmed.startsWith("data:image/") && trimmed.length <= 1_500_000;
 }
 
 function badRequest(error: string, message?: string) {
@@ -505,6 +518,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const clerkActive = isClerkServerConfigured();
+  const identity = clerkActive ? await getAuthenticatedClerkIdentity() : null;
+
+  if (clerkActive && !identity) {
+    return NextResponse.json(
+      { mode: "error", ok: false, error: "unauthorized" },
+      { status: 401 }
+    );
+  }
+
   let body: { action?: unknown; payload?: unknown };
   try {
     body = (await request.json()) as { action?: unknown; payload?: unknown };
@@ -527,29 +550,11 @@ export async function POST(request: Request) {
       ? (body.payload as Record<string, unknown>)
       : {};
 
-  const clerkActive = isClerkServerConfigured();
-  const identity = clerkActive ? await getAuthenticatedClerkIdentity() : null;
-
-  if (clerkActive && !identity) {
+  if (PROTECTED_ADMIN_ACTIONS.has(action) && clerkActive && !isFounderIdentity(identity)) {
     return NextResponse.json(
-      { mode: "error", ok: false, error: "unauthorized" },
-      { status: 401 }
+      { mode: "error", ok: false, error: "founder_only", message: "Founder access required" },
+      { status: 403 }
     );
-  }
-
-  if (PROTECTED_ADMIN_ACTIONS.has(action) && clerkActive) {
-    if (!identity) {
-      return NextResponse.json(
-        { mode: "error", ok: false, error: "unauthorized" },
-        { status: 401 }
-      );
-    }
-    if (!isFounderIdentity(identity)) {
-      return NextResponse.json(
-        { mode: "error", ok: false, error: "founder_only", message: "Founder access required" },
-        { status: 403 }
-      );
-    }
   }
 
   const sql = getSql();
@@ -579,6 +584,15 @@ export async function POST(request: Request) {
       const units = Array.isArray(payload.apartments)
         ? (payload.apartments as Apartment[])
         : [];
+      const baseSlug = b.shareSlug.trim();
+      const slugTaken = await sql`
+        select id from syndic_buildings where share_slug = ${baseSlug} limit 1
+      `;
+      const finalSlug =
+        slugTaken[0] && String(slugTaken[0].id) !== b.id
+          ? `${baseSlug}-${crypto.randomUUID().slice(0, 4)}`
+          : baseSlug;
+
       await sql`
         insert into syndic_buildings (
           id, owner_id, name, city, default_monthly_fee, opening_balance, start_month,
@@ -586,7 +600,7 @@ export async function POST(request: Request) {
           trial_ends_at, plan_expires_at, created_at
         ) values (
           ${b.id}, ${userId}, ${b.name}, ${b.city}, ${b.defaultMonthlyFee}, ${b.openingBalance}, ${b.startMonth},
-          ${b.rib}, ${b.shareSlug}, ${b.sharePin}, ${b.showNamesPublicly}, ${b.planStatus},
+          ${b.rib}, ${finalSlug}, ${b.sharePin}, ${b.showNamesPublicly}, ${b.planStatus},
           ${b.trialEndsAt}, ${b.planExpiresAt}, ${b.createdAt}
         ) on conflict (id) do nothing
       `;
@@ -613,7 +627,7 @@ export async function POST(request: Request) {
           insert into syndic_apartments (
             id, building_id, unit_label, resident_name, phone, monthly_fee, billing_cycle, active, sort_order
           ) values (
-            ${a.id}, ${a.buildingId}, ${a.unitLabel}, ${a.residentName}, ${a.phone},
+            ${a.id}, ${b.id}, ${a.unitLabel}, ${a.residentName}, ${a.phone},
             ${a.monthlyFee}, ${normalizeBillingCycle(a.billingCycle)}, ${a.active}, ${a.sortOrder}
           ) on conflict (id) do nothing
         `;
@@ -625,10 +639,17 @@ export async function POST(request: Request) {
         action: "create_building",
         summary: `${b.name} (${units.length} lots)`,
       });
+      return NextResponse.json({ mode: "neon", ok: true, shareSlug: finalSlug });
     } else if (action === "update_building") {
       const b = payload.building as Building | undefined;
-      if (!b || !b.id?.trim() || !b.name?.trim()) {
-        return badRequest("invalid_building", "Building id and name are required");
+      if (
+        !b ||
+        !b.id?.trim() ||
+        !b.name?.trim() ||
+        !isNonNegativeFinite(b.defaultMonthlyFee) ||
+        !Number.isFinite(Number(b.openingBalance))
+      ) {
+        return badRequest("invalid_building", "Valid building id, name and numbers are required");
       }
       const callerRole = await checkRole(b.id, ["syndic", "assistant"]);
       if (!callerRole) {
@@ -721,8 +742,13 @@ export async function POST(request: Request) {
       });
     } else if (action === "update_apartment") {
       const a = payload.apartment as Apartment | undefined;
-      if (!a || !a.id?.trim() || !a.unitLabel?.trim()) {
-        return badRequest("invalid_apartment", "Apartment id and unitLabel are required");
+      if (
+        !a ||
+        !a.id?.trim() ||
+        !a.unitLabel?.trim() ||
+        !isNonNegativeFinite(a.monthlyFee)
+      ) {
+        return badRequest("invalid_apartment", "Valid apartment id, unitLabel and non-negative monthlyFee are required");
       }
       const aRows = await sql`
         select building_id from syndic_apartments where id = ${a.id} limit 1
@@ -767,6 +793,14 @@ export async function POST(request: Request) {
       const callerRole = await checkRole(p.buildingId, ["syndic", "assistant"]);
       if (!callerRole) {
         return forbidden();
+      }
+      const aptCheck = await sql`
+        select 1 from syndic_apartments
+        where id = ${p.apartmentId} and building_id = ${p.buildingId}
+        limit 1
+      `;
+      if (!aptCheck[0]) {
+        return badRequest("invalid_apartment", "Apartment does not belong to target building");
       }
       await sql`
         insert into syndic_payments (
@@ -816,6 +850,17 @@ export async function POST(request: Request) {
         ) {
           return badRequest("invalid_payment", "Each payment must include valid IDs and positive amount");
         }
+      }
+      const batchAptIds = Array.from(new Set(list.map((p) => p.apartmentId)));
+      const aptCountRows = await sql`
+        select count(*)::int as cnt
+        from syndic_apartments
+        where building_id = ${targetBuildingId} and id = any(${batchAptIds})
+      `;
+      if (Number(aptCountRows[0]?.cnt ?? 0) !== batchAptIds.length) {
+        return badRequest("invalid_apartment", "One or more apartments do not belong to target building");
+      }
+      for (const p of list) {
         await sql`
           insert into syndic_payments (
             id, building_id, apartment_id, month_key, amount, method, receipt_number, note, paid_at
@@ -870,9 +915,10 @@ export async function POST(request: Request) {
         !e.id?.trim() ||
         !e.buildingId?.trim() ||
         !e.description?.trim() ||
-        !isPositiveFinite(e.amount)
+        !isPositiveFinite(e.amount) ||
+        !isValidOptionalImageDataUrl(e.receiptPhotoUrl)
       ) {
-        return badRequest("invalid_expense", "Expense id, buildingId, description and positive amount are required");
+        return badRequest("invalid_expense", "Expense id, buildingId, description, positive amount and valid image are required");
       }
       const callerRole = await checkRole(e.buildingId, ["syndic", "assistant"]);
       if (!callerRole) {
@@ -922,9 +968,10 @@ export async function POST(request: Request) {
         !r ||
         !r.id?.trim() ||
         !r.buildingId?.trim() ||
-        !isPositiveFinite(r.amountMAD)
+        !isPositiveFinite(r.amountMAD) ||
+        !isValidOptionalImageDataUrl(r.proofPhotoUrl)
       ) {
-        return badRequest("invalid_request", "Valid subscription request payload is required");
+        return badRequest("invalid_request", "Valid subscription request payload and proof image are required");
       }
       if (!(await checkRole(r.buildingId, ["syndic", "assistant"]))) {
         return forbidden();
@@ -979,6 +1026,17 @@ export async function POST(request: Request) {
             ? "Only the principal syndic can invite building admins"
             : "Insufficient permissions to invite members"
         );
+      }
+
+      if (apartmentId) {
+        const aptCheck = await sql`
+          select 1 from syndic_apartments
+          where id = ${apartmentId} and building_id = ${buildingId}
+          limit 1
+        `;
+        if (!aptCheck[0]) {
+          return badRequest("invalid_apartment", "Apartment does not belong to target building");
+        }
       }
 
       const existingRows = await sql`
@@ -1053,8 +1111,28 @@ export async function POST(request: Request) {
       if (String(target.role) === "syndic") {
         return badRequest("cannot_modify_syndic", "Cannot change the principal syndic role");
       }
-      if (!(await checkRole(String(target.building_id), ["syndic"]))) {
-        return forbidden("Only the principal syndic can change member roles");
+      const targetBuildingId = String(target.building_id);
+      const existingRole = normalizeMemberRole(target.role);
+      const isRoleChange = rawRole !== existingRole;
+      const callerRole = await checkRole(
+        targetBuildingId,
+        isRoleChange || existingRole === "assistant"
+          ? ["syndic"]
+          : ["syndic", "assistant"]
+      );
+      if (!callerRole) {
+        return forbidden("Insufficient permissions to update this member");
+      }
+
+      if (hasApt && apartmentId) {
+        const aptCheck = await sql`
+          select 1 from syndic_apartments
+          where id = ${apartmentId} and building_id = ${targetBuildingId}
+          limit 1
+        `;
+        if (!aptCheck[0]) {
+          return badRequest("invalid_apartment", "Apartment does not belong to target building");
+        }
       }
 
       const updated = hasApt
@@ -1072,9 +1150,9 @@ export async function POST(request: Request) {
           `;
 
       await writeAuditLog(sql, {
-        buildingId: String(target.building_id),
+        buildingId: targetBuildingId,
         identity,
-        role: "syndic",
+        role: callerRole,
         action: "update_member_role",
         summary: `${String(target.email)} -> ${rawRole}`,
       });

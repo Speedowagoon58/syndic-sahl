@@ -242,7 +242,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                       key={u.unitLabel}
                       className="rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
                     >
-                      {u.unitLabel} ({u.monthlyFee} MAD)
+                      {u.unitLabel} ({u.monthlyFee} {t.common.mad})
                     </span>
                   ))}
                 </div>

@@ -658,7 +658,10 @@ export function PaymentsTab() {
                         <div className="font-medium text-zinc-900 dark:text-zinc-100">
                           {apt.residentName || "—"}
                         </div>
-                        <div className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+                        <div
+                          dir="ltr"
+                          className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500"
+                        >
                           {apt.phone || t.payments.noPhone}
                         </div>
                       </td>
@@ -732,7 +735,11 @@ export function PaymentsTab() {
                               </a>
                               <button
                                 type="button"
-                                onClick={() => cancelPayment(payment.id)}
+                                onClick={() => {
+                                  if (window.confirm(t.payments.confirmUndo)) {
+                                    cancelPayment(payment.id);
+                                  }
+                                }}
                                 title={t.payments.cancelPayment}
                                 aria-label={t.payments.cancelPayment}
                                 className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400"

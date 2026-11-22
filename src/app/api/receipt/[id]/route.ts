@@ -35,6 +35,7 @@ export async function GET(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
+    let viewerRole: string = "syndic";
     if (clerkActive && identity) {
       await claimUnownedLegacyBuildingsIfNeeded(sql, identity);
       await activateMatchingInvites(sql, identity);
@@ -52,10 +53,11 @@ export async function GET(
       ) {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
       }
+      viewerRole = membership.role;
     }
 
     const [bRows, aRows] = await Promise.all([
-      sql`select id, name, city from syndic_buildings where id = ${String(p.building_id)} limit 1`,
+      sql`select id, name, city, share_slug from syndic_buildings where id = ${String(p.building_id)} limit 1`,
       sql`select id, unit_label, resident_name from syndic_apartments where id = ${String(p.apartment_id)} limit 1`,
     ]);
 
@@ -67,6 +69,7 @@ export async function GET(
 
     return NextResponse.json({
       mode: "cloud",
+      viewerRole,
       payment: {
         id: String(p.id),
         buildingId: String(p.building_id),
@@ -82,6 +85,7 @@ export async function GET(
         id: String(b.id),
         name: String(b.name),
         city: String(b.city ?? ""),
+        shareSlug: String(b.share_slug ?? ""),
       },
       apartment: {
         id: String(a.id),

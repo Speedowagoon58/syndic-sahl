@@ -56,11 +56,25 @@ body {
   .print-sheet {
     box-shadow: none !important;
     border: none !important;
-    background: #ffffff !important;
-    color: #000000 !important;
+    background-color: #ffffff !important;
+    color: #09090b !important;
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
     width: 100% !important;
+  }
+
+  .print-sheet,
+  .print-sheet * {
+    color: #09090b !important;
+    border-color: #d4d4d8 !important;
+  }
+
+  .print-sheet div,
+  .print-sheet table,
+  .print-sheet tr,
+  .print-sheet td,
+  .print-sheet th {
+    background-color: transparent !important;
   }
 }
