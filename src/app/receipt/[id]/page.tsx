@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -11,14 +11,64 @@ import {
   formatMAD,
   formatMonthLabel,
 } from "@/lib/calculations";
+import type { Payment } from "@/lib/types";
+
+interface CloudReceiptPayload {
+  payment: Payment;
+  building: { id: string; name: string; city: string };
+  apartment: { id: string; unitLabel: string; residentName: string };
+}
 
 export default function ReceiptPage() {
   const params = useParams<{ id: string }>();
   const paymentId = typeof params?.id === "string" ? params.id : "";
 
   const { hydrated, data, locale, t } = useApp();
+  const [cloudLoading, setCloudLoading] = useState(true);
+  const [cloudMode, setCloudMode] = useState<"unknown" | "local" | "cloud">(
+    "unknown"
+  );
+  const [cloudReceipt, setCloudReceipt] = useState<CloudReceiptPayload | null>(
+    null
+  );
 
-  if (!hydrated) {
+  useEffect(() => {
+    if (!hydrated || !paymentId) return;
+    let active = true;
+    fetch(`/api/receipt/${encodeURIComponent(paymentId)}`)
+      .then(async (res) => {
+        if (!active) return;
+        if (res.status === 404) {
+          setCloudMode("cloud");
+          setCloudReceipt(null);
+          setCloudLoading(false);
+          return;
+        }
+        const json = await res.json();
+        if (!active) return;
+        if (json.mode === "local") {
+          setCloudMode("local");
+        } else if (res.ok && json.payment) {
+          setCloudMode("cloud");
+          setCloudReceipt({
+            payment: json.payment,
+            building: json.building,
+            apartment: json.apartment,
+          });
+        }
+        setCloudLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCloudMode("local");
+        setCloudLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [hydrated, paymentId]);
+
+  if (!hydrated || (cloudLoading && cloudMode === "unknown")) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400">
         {t.common.loading}
@@ -26,13 +76,24 @@ export default function ReceiptPage() {
     );
   }
 
-  const payment = data.payments.find((p) => p.id === paymentId);
-  const building = payment
-    ? data.buildings.find((b) => b.id === payment.buildingId)
+  const localPayment = data.payments.find((p) => p.id === paymentId);
+  const localBuilding = localPayment
+    ? data.buildings.find((b) => b.id === localPayment.buildingId)
     : null;
-  const apartment = payment
-    ? data.apartments.find((a) => a.id === payment.apartmentId)
+  const localApartment = localPayment
+    ? data.apartments.find((a) => a.id === localPayment.apartmentId)
     : null;
+
+  const payment =
+    cloudMode === "cloud" ? cloudReceipt?.payment ?? null : localPayment ?? null;
+  const building =
+    cloudMode === "cloud"
+      ? cloudReceipt?.building ?? null
+      : localBuilding ?? null;
+  const apartment =
+    cloudMode === "cloud"
+      ? cloudReceipt?.apartment ?? null
+      : localApartment ?? null;
 
   if (!payment || !building || !apartment) {
     return (

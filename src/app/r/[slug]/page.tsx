@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -24,6 +24,14 @@ import {
   shiftMonthKey,
 } from "@/lib/calculations";
 import { ReceiptLightbox } from "@/components/ReceiptLightbox";
+import type { Apartment, Building, Expense, Payment } from "@/lib/types";
+
+interface CloudPortalPayload {
+  building: Building;
+  apartments: Apartment[];
+  payments: Payment[];
+  expenses: Expense[];
+}
 
 export default function PublicResidentPortalPage() {
   const params = useParams<{ slug: string }>();
@@ -40,29 +48,154 @@ export default function PublicResidentPortalPage() {
     caption: string;
   } | null>(null);
 
-  const building = useMemo(
+  const [cloudLoading, setCloudLoading] = useState(true);
+  const [cloudMode, setCloudMode] = useState<"unknown" | "local" | "cloud">(
+    "unknown"
+  );
+  const [cloudData, setCloudData] = useState<CloudPortalPayload | null>(null);
+  const [cloudNotFound, setCloudNotFound] = useState(false);
+  const [cloudPinRequired, setCloudPinRequired] = useState<{
+    buildingName: string;
+    city: string;
+  } | null>(null);
+
+  const fetchCloudPortal = useCallback(
+    async (pin?: string) => {
+      if (!slug) return;
+      const qs = pin ? `?pin=${encodeURIComponent(pin)}` : "";
+      try {
+        const res = await fetch(
+          `/api/public/${encodeURIComponent(slug)}${qs}`
+        );
+        if (res.status === 404) {
+          setCloudMode("cloud");
+          setCloudNotFound(true);
+          setCloudPinRequired(null);
+          return;
+        }
+        const json = await res.json();
+        if (json.mode === "local") {
+          setCloudMode("local");
+          return;
+        }
+        if (res.status === 401 && json.requiresPin) {
+          setCloudMode("cloud");
+          setCloudPinRequired({
+            buildingName: json.buildingName ?? slug,
+            city: json.city ?? "",
+          });
+          if (json.pinInvalid) {
+            setPinError(true);
+          }
+          return;
+        }
+        if (res.ok && json.building) {
+          setCloudMode("cloud");
+          setCloudPinRequired(null);
+          setCloudNotFound(false);
+          setUnlocked(true);
+          setPinError(false);
+          setCloudData({
+            building: json.building,
+            apartments: json.apartments ?? [],
+            payments: json.payments ?? [],
+            expenses: json.expenses ?? [],
+          });
+        }
+      } catch {
+        setCloudMode("local");
+      } finally {
+        setCloudLoading(false);
+      }
+    },
+    [slug]
+  );
+
+  useEffect(() => {
+    if (!hydrated || !slug) return;
+    let active = true;
+    fetch(`/api/public/${encodeURIComponent(slug)}`)
+      .then(async (res) => {
+        if (!active) return;
+        if (res.status === 404) {
+          setCloudMode("cloud");
+          setCloudNotFound(true);
+          setCloudLoading(false);
+          return;
+        }
+        const json = await res.json();
+        if (!active) return;
+        if (json.mode === "local") {
+          setCloudMode("local");
+          setCloudLoading(false);
+          return;
+        }
+        if (res.status === 401 && json.requiresPin) {
+          setCloudMode("cloud");
+          setCloudPinRequired({
+            buildingName: json.buildingName ?? slug,
+            city: json.city ?? "",
+          });
+          setCloudLoading(false);
+          return;
+        }
+        if (res.ok && json.building) {
+          setCloudMode("cloud");
+          setUnlocked(true);
+          setCloudData({
+            building: json.building,
+            apartments: json.apartments ?? [],
+            payments: json.payments ?? [],
+            expenses: json.expenses ?? [],
+          });
+        }
+        setCloudLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCloudMode("local");
+        setCloudLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [hydrated, slug]);
+
+  const localBuilding = useMemo(
     () => data.buildings.find((b) => b.shareSlug === slug) ?? null,
     [data.buildings, slug]
   );
 
+  const building = cloudMode === "cloud" ? cloudData?.building ?? null : localBuilding;
+
   const apartments = useMemo(() => {
-    if (!building) return [];
+    if (cloudMode === "cloud") {
+      return cloudData?.apartments ?? [];
+    }
+    if (!localBuilding) return [];
     return data.apartments
-      .filter((a) => a.buildingId === building.id && a.active)
+      .filter((a) => a.buildingId === localBuilding.id && a.active)
       .sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [data.apartments, building]);
+  }, [cloudMode, cloudData, data.apartments, localBuilding]);
 
   const payments = useMemo(() => {
-    if (!building) return [];
-    return data.payments.filter((p) => p.buildingId === building.id);
-  }, [data.payments, building]);
+    if (cloudMode === "cloud") {
+      return cloudData?.payments ?? [];
+    }
+    if (!localBuilding) return [];
+    return data.payments.filter((p) => p.buildingId === localBuilding.id);
+  }, [cloudMode, cloudData, data.payments, localBuilding]);
 
   const expenses = useMemo(() => {
-    if (!building) return [];
+    if (cloudMode === "cloud") {
+      return cloudData?.expenses ?? [];
+    }
+    if (!localBuilding) return [];
     return data.expenses
-      .filter((e) => e.buildingId === building.id)
+      .filter((e) => e.buildingId === localBuilding.id)
       .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
-  }, [data.expenses, building]);
+  }, [cloudMode, cloudData, data.expenses, localBuilding]);
 
   const summary = useMemo(() => {
     if (!building) return null;
@@ -75,7 +208,7 @@ export default function PublicResidentPortalPage() {
     );
   }, [building, apartments, payments, expenses, monthKey]);
 
-  if (!hydrated) {
+  if (!hydrated || (cloudLoading && cloudMode === "unknown")) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400">
         {t.common.loading}
@@ -83,7 +216,55 @@ export default function PublicResidentPortalPage() {
     );
   }
 
-  if (!building || !summary) {
+  // Cloud PIN Screen
+  if (cloudMode === "cloud" && cloudPinRequired && !unlocked) {
+    const handleCloudPinSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      void fetchCloudPortal(pinInput.trim());
+    };
+
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-4">
+        <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xs">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800">
+            <Lock className="h-4 w-4" />
+          </div>
+          <h1 className="mt-4 text-center text-sm font-semibold text-zinc-950">
+            {cloudPinRequired.buildingName}
+          </h1>
+          <p className="mt-1 text-center text-xs text-zinc-500">
+            {t.portal.pinDesc}
+          </p>
+
+          <form onSubmit={handleCloudPinSubmit} className="mt-5 space-y-3">
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              required
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              placeholder={t.portal.pinPlaceholder}
+              className="w-full rounded-lg border border-zinc-200 px-4 py-2 text-center font-mono text-base tracking-widest focus:border-zinc-900 focus:outline-none"
+            />
+            {pinError && (
+              <p className="text-center text-xs font-medium text-red-600">
+                {t.portal.pinError}
+              </p>
+            )}
+            <button
+              type="submit"
+              className="w-full rounded-lg bg-zinc-900 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+            >
+              {t.portal.unlockBtn}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (cloudNotFound || !building || !summary) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-6 text-center">
         <div className="max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-2xs">
@@ -104,8 +285,10 @@ export default function PublicResidentPortalPage() {
     );
   }
 
-  const requiresPin = Boolean(building.sharePin.trim());
-  if (requiresPin && !unlocked) {
+  // Local Mode PIN Check
+  const requiresLocalPin =
+    cloudMode !== "cloud" && Boolean(building.sharePin.trim());
+  if (requiresLocalPin && !unlocked) {
     const handlePinSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (pinInput.trim() === building.sharePin.trim()) {

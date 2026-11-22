@@ -49,6 +49,20 @@ import type {
 
 const emptySubscribe = () => () => {};
 
+function syncWorkspaceAction(
+  action: string,
+  payload: Record<string, unknown> = {}
+): void {
+  if (typeof window === "undefined") return;
+  fetch("/api/workspace", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, payload }),
+  }).catch(() => {
+    // Local persistence remains active if offline.
+  });
+}
+
 interface CreateBuildingInput {
   name: string;
   city: string;
@@ -65,6 +79,7 @@ interface CreateBuildingInput {
 
 interface AppContextValue {
   hydrated: boolean;
+  cloudConnected: boolean;
   data: AppData;
   t: TranslationDict;
   locale: Locale;
@@ -166,6 +181,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const [data, setData] = useState<AppData>(() => loadAppData());
+  const [cloudConnected, setCloudConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>("payments");
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() =>
     getCurrentMonthKey()
@@ -186,8 +202,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     let active = true;
+    fetch("/api/workspace")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((remote) => {
+        if (
+          !active ||
+          !remote ||
+          remote.mode !== "neon" ||
+          !Array.isArray(remote.buildings) ||
+          remote.buildings.length === 0
+        ) {
+          return;
+        }
+        setCloudConnected(true);
+        setData((prev) => {
+          const validActive = remote.buildings.some(
+            (b: Building) => b.id === prev.activeBuildingId
+          )
+            ? prev.activeBuildingId
+            : remote.buildings[0].id;
+          return {
+            ...prev,
+            activeBuildingId: validActive,
+            buildings: remote.buildings,
+            apartments: remote.apartments ?? [],
+            payments: remote.payments ?? [],
+            expenses: remote.expenses ?? [],
+            subscriptionRequests: remote.subscriptionRequests ?? [],
+          };
+        });
+      })
+      .catch(() => {
+        // Fallback to Supabase client or local mode below
+      });
+
     fetchCloudWorkspace().then((cloud) => {
       if (!active || !cloud) return;
+      setCloudConnected(true);
       setData((prev) => ({
         ...prev,
         activeBuildingId: cloud.buildings[0]?.id ?? prev.activeBuildingId,
@@ -314,6 +365,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apartments: [...prev.apartments, ...newApartments],
       }));
 
+      syncWorkspaceAction("create_building", {
+        building: newBuilding,
+        apartments: newApartments,
+      });
       showToast(t.common.saved);
       return newBuilding;
     },
@@ -338,16 +393,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       >
     ): boolean => {
       if (!guardWritable()) return false;
+      const target = data.buildings.find((b) => b.id === buildingId);
       setData((prev) => ({
         ...prev,
         buildings: prev.buildings.map((b) =>
           b.id === buildingId ? { ...b, ...patch } : b
         ),
       }));
+      if (target) {
+        syncWorkspaceAction("update_building", {
+          building: { ...target, ...patch },
+        });
+      }
       showToast(t.settings.savedToast);
       return true;
     },
-    [guardWritable, showToast, t.settings.savedToast]
+    [data.buildings, guardWritable, showToast, t.settings.savedToast]
   );
 
   const addApartment = useCallback(
@@ -376,6 +437,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         apartments: [...prev.apartments, apt],
       }));
+      syncWorkspaceAction("add_apartments", { apartments: [apt] });
       showToast(t.common.saved);
       return true;
     },
@@ -416,6 +478,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         apartments: [...prev.apartments, ...created],
       }));
+      syncWorkspaceAction("add_apartments", { apartments: created });
       showToast(t.common.saved);
       return true;
     },
@@ -454,6 +517,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         apartments: [...prev.apartments, ...created],
       }));
+      syncWorkspaceAction("add_apartments", { apartments: created });
       showToast(t.common.saved);
       return true;
     },
@@ -471,16 +535,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       >
     ): boolean => {
       if (!guardWritable()) return false;
+      const targetApt = data.apartments.find((a) => a.id === apartmentId);
       setData((prev) => ({
         ...prev,
         apartments: prev.apartments.map((a) =>
           a.id === apartmentId ? { ...a, ...patch } : a
         ),
       }));
+      if (targetApt) {
+        syncWorkspaceAction("update_apartment", {
+          apartment: { ...targetApt, ...patch },
+        });
+      }
       showToast(t.common.saved);
       return true;
     },
-    [guardWritable, showToast, t.common.saved]
+    [data.apartments, guardWritable, showToast, t.common.saved]
   );
 
   const recordPayment = useCallback(
@@ -519,6 +589,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
+      syncWorkspaceAction("record_payment", { payment: newPayment });
       void pushPaymentToCloud(newPayment);
       showToast(t.common.saved);
       return newPayment;
@@ -533,6 +604,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         payments: prev.payments.filter((p) => p.id !== paymentId),
       }));
+      syncWorkspaceAction("cancel_payment", { paymentId });
       return true;
     },
     [guardWritable]
@@ -561,6 +633,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         expenses: [exp, ...prev.expenses],
       }));
+      syncWorkspaceAction("add_expense", { expense: exp });
       void pushExpenseToCloud(exp);
       showToast(t.common.saved);
       return true;
@@ -575,6 +648,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         expenses: prev.expenses.filter((e) => e.id !== expenseId),
       }));
+      syncWorkspaceAction("delete_expense", { expenseId });
       return true;
     },
     [guardWritable]
@@ -605,6 +679,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         subscriptionRequests: [req, ...prev.subscriptionRequests],
       }));
+      syncWorkspaceAction("submit_subscription_request", { request: req });
       showToast(t.subscription.submittedMsg);
       return refCode;
     },
@@ -616,6 +691,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const expires = new Date();
       expires.setMonth(expires.getMonth() + months);
       const expiresIso = expires.toISOString();
+      const target = data.buildings.find((b) => b.id === buildingId);
       setData((prev) => ({
         ...prev,
         buildings: prev.buildings.map((b) =>
@@ -628,9 +704,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
+      if (target) {
+        syncWorkspaceAction("update_building", {
+          building: {
+            ...target,
+            planStatus: "active",
+            planExpiresAt: expiresIso,
+          },
+        });
+      }
       showToast(t.common.saved);
     },
-    [showToast, t.common.saved]
+    [data.buildings, showToast, t.common.saved]
   );
 
   const adminApproveRequest = useCallback(
@@ -641,6 +726,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const expires = new Date();
       expires.setMonth(expires.getMonth() + months);
       const expiresIso = expires.toISOString();
+      const targetBuilding = data.buildings.find(
+        (b) => b.id === target.buildingId
+      );
 
       setData((prev) => ({
         ...prev,
@@ -653,9 +741,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
+      syncWorkspaceAction("update_subscription_request", {
+        requestId,
+        status: "approved",
+      });
+      if (targetBuilding) {
+        syncWorkspaceAction("update_building", {
+          building: {
+            ...targetBuilding,
+            planStatus: "active",
+            planExpiresAt: expiresIso,
+          },
+        });
+      }
       showToast(t.common.saved);
     },
-    [data.subscriptionRequests, showToast, t.common.saved]
+    [data.buildings, data.subscriptionRequests, showToast, t.common.saved]
   );
 
   const adminRejectRequest = useCallback(
@@ -666,6 +767,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           r.id === requestId ? { ...r, status: "rejected" } : r
         ),
       }));
+      syncWorkspaceAction("update_subscription_request", {
+        requestId,
+        status: "rejected",
+      });
       showToast(t.common.saved);
     },
     [showToast, t.common.saved]
@@ -674,6 +779,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const adminSetBuildingExpired = useCallback(
     (buildingId: string) => {
       const pastIso = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const target = data.buildings.find((b) => b.id === buildingId);
       setData((prev) => ({
         ...prev,
         buildings: prev.buildings.map((b) =>
@@ -687,9 +793,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
+      if (target) {
+        syncWorkspaceAction("update_building", {
+          building: {
+            ...target,
+            planStatus: "expired",
+            trialEndsAt: pastIso,
+            planExpiresAt: pastIso,
+          },
+        });
+      }
       showToast(t.common.saved);
     },
-    [showToast, t.common.saved]
+    [data.buildings, showToast, t.common.saved]
   );
 
   const adminRestoreBuildingTrial = useCallback(
@@ -697,6 +813,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const futureIso = new Date(
         Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000
       ).toISOString();
+      const target = data.buildings.find((b) => b.id === buildingId);
       setData((prev) => ({
         ...prev,
         buildings: prev.buildings.map((b) =>
@@ -710,21 +827,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : b
         ),
       }));
+      if (target) {
+        syncWorkspaceAction("update_building", {
+          building: {
+            ...target,
+            planStatus: "trial",
+            trialEndsAt: futureIso,
+            planExpiresAt: null,
+          },
+        });
+      }
       showToast(t.common.saved);
     },
-    [showToast, t.common.saved]
+    [data.buildings, showToast, t.common.saved]
   );
 
   const resetDemoData = useCallback(() => {
     const fresh = resetDemoAppData();
     setData(fresh);
     setSelectedMonthKey(getCurrentMonthKey());
+    syncWorkspaceAction("reset_demo");
     showToast(t.common.saved);
   }, [showToast, t.common.saved]);
 
   const value = useMemo<AppContextValue>(
     () => ({
       hydrated,
+      cloudConnected,
       data,
       t,
       locale: data.locale,
@@ -763,6 +892,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       hydrated,
+      cloudConnected,
       data,
       t,
       activeTab,
