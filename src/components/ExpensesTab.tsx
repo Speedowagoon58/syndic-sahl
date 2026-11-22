@@ -30,7 +30,7 @@ const CATEGORIES: ExpenseCategory[] = [
 ];
 
 const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
-  gardiennage: "bg-zinc-900",
+  gardiennage: "bg-zinc-900 dark:bg-zinc-200",
   eau_electricite: "bg-emerald-600",
   ascenseur: "bg-amber-500",
   nettoyage: "bg-sky-600",

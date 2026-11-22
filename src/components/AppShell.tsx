@@ -4,7 +4,6 @@ import React from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
-  ChevronDown,
   CreditCard,
   FileBarChart2,
   Link2,
@@ -121,12 +120,12 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
 
         {/* Workspace / Building Switcher */}
         <div className="p-3 border-b border-zinc-200/70 dark:border-zinc-800 space-y-2">
-          <div className="relative">
+          <div>
             <select
               aria-label={t.header.switchBuilding}
               value={activeBuilding.id}
               onChange={(e) => setActiveBuildingId(e.target.value)}
-              className="w-full appearance-none [-webkit-appearance:none] [-moz-appearance:none] bg-none rounded-lg border border-zinc-200/90 bg-white ps-3 pe-8 py-2 text-xs font-semibold text-zinc-900 shadow-2xs hover:border-zinc-300 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+              className="w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-xs font-semibold text-zinc-900 shadow-2xs hover:border-zinc-300 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
             >
               {data.buildings.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -134,7 +133,6 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute end-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
           </div>
 
           <button
@@ -160,7 +158,7 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all ${
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium ${
                   isActive
                     ? "bg-zinc-900 text-white shadow-2xs dark:bg-zinc-100 dark:text-zinc-950"
                     : "text-zinc-600 hover:bg-zinc-200/50 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"

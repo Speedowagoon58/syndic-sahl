@@ -20,25 +20,43 @@ export function AuthPageShell({ mode }: AuthPageShellProps) {
   const { locale, setLocale, theme, toggleTheme } = useApp();
   const isAr = locale === "ar";
 
-  const clerkAppearance = {
-    variables:
-      theme === "dark"
-        ? {
+  const clerkAppearance =
+    theme === "dark"
+      ? {
+          variables: {
             colorBackground: "#111113",
             colorText: "#f4f4f5",
+            colorForeground: "#f4f4f5",
+            colorMutedForeground: "#a1a1aa",
             colorTextSecondary: "#a1a1aa",
             colorInputBackground: "#09090b",
             colorInputText: "#f4f4f5",
+            colorInputForeground: "#f4f4f5",
             colorPrimary: "#f4f4f5",
             colorTextOnPrimaryBackground: "#09090b",
-            colorNeutral: "#3f3f46",
-          }
-        : {
+            colorPrimaryForeground: "#09090b",
+            colorNeutral: "#e4e4e7",
+          },
+          elements: {
+            card: "border border-zinc-800 bg-[#111113]",
+            socialButtonsBlockButton:
+              "!bg-zinc-900 !border !border-zinc-700 !text-zinc-100 hover:!bg-zinc-800",
+            socialButtonsBlockButtonText: "!text-zinc-100 font-medium",
+            dividerText: "!text-zinc-400",
+            dividerLine: "!bg-zinc-800",
+            formFieldLabel: "!text-zinc-300",
+            formButtonPrimary: "!bg-zinc-100 !text-zinc-950 hover:!bg-zinc-200",
+            footerActionText: "!text-zinc-400",
+            footerActionLink: "!text-zinc-100 hover:!text-zinc-300",
+          },
+        }
+      : {
+          variables: {
             colorBackground: "#ffffff",
             colorText: "#09090b",
             colorPrimary: "#18181b",
           },
-  };
+        };
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#F6F6F4] p-4 text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100">
