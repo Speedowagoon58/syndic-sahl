@@ -14,6 +14,8 @@ export type PlanStatus = "trial" | "active" | "expired";
 export type PlanDuration = "semi_annual" | "annual";
 export type SubscriptionChannel = "virement" | "cashplus";
 export type SubscriptionRequestStatus = "pending" | "approved" | "rejected";
+export type MemberRole = "syndic" | "assistant" | "tenant";
+export type MemberStatus = "invited" | "active" | "revoked";
 export type AppTab = "payments" | "expenses" | "report" | "subscription" | "settings";
 
 export interface Building {
@@ -82,6 +84,21 @@ export interface SubscriptionRequest {
   createdAt: string;
 }
 
+export interface BuildingMembership {
+  id: string;
+  buildingId: string;
+  email: string;
+  clerkUserId: string | null;
+  role: MemberRole;
+  apartmentId: string | null;
+  displayName: string;
+  inviteToken: string;
+  status: MemberStatus;
+  invitedBy: string | null;
+  createdAt: string;
+  acceptedAt: string | null;
+}
+
 export interface AppData {
   locale: Locale;
   theme: ThemeMode;
@@ -92,4 +109,6 @@ export interface AppData {
   payments: Payment[];
   expenses: Expense[];
   subscriptionRequests: SubscriptionRequest[];
+  memberships: BuildingMembership[];
+  myRoles: Record<string, MemberRole>;
 }

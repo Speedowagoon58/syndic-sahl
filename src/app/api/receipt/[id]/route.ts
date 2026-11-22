@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  activateMatchingInvites,
+  claimUnownedLegacyBuildingsIfNeeded,
+  getAuthenticatedClerkIdentity,
+  getUserBuildingMembership,
+  isClerkServerConfigured,
+} from "@/lib/auth-server";
 import { ensureNeonSchema, getSql } from "@/lib/neon";
 
 export async function GET(
@@ -6,8 +13,14 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
-  const sql = getSql();
+  const clerkActive = isClerkServerConfigured();
+  const identity = clerkActive ? await getAuthenticatedClerkIdentity() : null;
 
+  if (clerkActive && !identity) {
+    return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  }
+
+  const sql = getSql();
   if (!sql) {
     return NextResponse.json({ mode: "local" });
   }
@@ -20,6 +33,25 @@ export async function GET(
     const p = pRows[0];
     if (!p) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    if (clerkActive && identity) {
+      await claimUnownedLegacyBuildingsIfNeeded(sql, identity);
+      await activateMatchingInvites(sql, identity);
+
+      const membership = await getUserBuildingMembership(
+        sql,
+        String(p.building_id),
+        identity
+      );
+      if (
+        !membership ||
+        (membership.role === "tenant" &&
+          membership.apartmentId &&
+          membership.apartmentId !== String(p.apartment_id))
+      ) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
     }
 
     const [bRows, aRows] = await Promise.all([

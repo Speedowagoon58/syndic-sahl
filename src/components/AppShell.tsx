@@ -35,6 +35,7 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
     cloudConnected,
     data,
     activeBuilding,
+    activeBuildingRole,
     setActiveBuildingId,
     activeTab,
     setActiveTab,
@@ -133,6 +134,15 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-zinc-400 dark:text-zinc-500">
+              {t.header.switchBuilding}
+            </span>
+            <span className="rounded bg-zinc-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              {t.header.roleBadge[activeBuildingRole]}
+            </span>
           </div>
 
           <button
@@ -297,7 +307,7 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
               </button>
             </div>
 
-            {/* Desktop breadcrumb title */}
+            {/* Desktop breadcrumb title + role badge */}
             <div className="hidden lg:flex lg:items-center lg:gap-2.5">
               <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                 {activeBuilding.name}
@@ -305,6 +315,9 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
               <span className="text-zinc-300 dark:text-zinc-700">/</span>
               <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                 {activeBuilding.city}
+              </span>
+              <span className="rounded-md border border-zinc-200/80 bg-zinc-50 px-2 py-0.5 text-[10px] font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                {t.header.roleBadge[activeBuildingRole]}
               </span>
             </div>
           </div>

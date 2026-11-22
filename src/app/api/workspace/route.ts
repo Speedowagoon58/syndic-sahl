@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import {
+  activateMatchingInvites,
+  claimUnownedLegacyBuildingsIfNeeded,
+  getAuthenticatedClerkIdentity,
+  getUserBuildingMembership,
+  isClerkServerConfigured,
+  mapMembershipRow,
+  normalizeMemberRole,
+} from "@/lib/auth-server";
 import { normalizeBillingCycle } from "@/lib/calculations";
 import { ensureNeonSchema, getSql, seedNeonDatabase } from "@/lib/neon";
 import type {
   Apartment,
   Building,
+  BuildingMembership,
   Expense,
+  MemberRole,
   Payment,
   SubscriptionRequest,
 } from "@/lib/types";
@@ -24,6 +34,9 @@ const ALLOWED_ACTIONS = new Set([
   "submit_subscription_request",
   "update_subscription_request",
   "reset_demo",
+  "invite_member",
+  "update_member_role",
+  "revoke_member",
 ]);
 
 const PROTECTED_ADMIN_ACTIONS = new Set([
@@ -31,26 +44,13 @@ const PROTECTED_ADMIN_ACTIONS = new Set([
   "reset_demo",
 ]);
 
-function isClerkConfigured(): boolean {
-  return Boolean(
-    process.env.CLERK_SECRET_KEY &&
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-  );
-}
-
-async function getSignedInUserId(): Promise<string | null> {
-  if (!isClerkConfigured()) return null;
-  try {
-    const { userId } = await auth();
-    return userId ?? null;
-  } catch {
-    return null;
-  }
-}
-
 function isPositiveFinite(val: unknown): val is number {
   const n = Number(val);
   return Number.isFinite(n) && n > 0;
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function badRequest(error: string, message?: string) {
@@ -60,7 +60,42 @@ function badRequest(error: string, message?: string) {
   );
 }
 
+function forbidden(message = "Insufficient role permissions for this building") {
+  return NextResponse.json(
+    { mode: "error", ok: false, error: "forbidden", message },
+    { status: 403 }
+  );
+}
+
+function mapBuilding(b: Record<string, unknown>): Building {
+  return {
+    id: String(b.id),
+    name: String(b.name),
+    city: String(b.city ?? ""),
+    defaultMonthlyFee: Number(b.default_monthly_fee),
+    openingBalance: Number(b.opening_balance),
+    startMonth: String(b.start_month),
+    rib: String(b.rib ?? ""),
+    shareSlug: String(b.share_slug),
+    sharePin: String(b.share_pin ?? ""),
+    showNamesPublicly: Boolean(b.show_names_publicly),
+    planStatus: b.plan_status as Building["planStatus"],
+    trialEndsAt: new Date(String(b.trial_ends_at)).toISOString(),
+    planExpiresAt: b.plan_expires_at
+      ? new Date(String(b.plan_expires_at)).toISOString()
+      : null,
+    createdAt: new Date(String(b.created_at)).toISOString(),
+  };
+}
+
 export async function GET() {
+  const clerkActive = isClerkServerConfigured();
+  const identity = clerkActive ? await getAuthenticatedClerkIdentity() : null;
+
+  if (clerkActive && !identity) {
+    return NextResponse.json({ mode: "auth_required" });
+  }
+
   const sql = getSql();
   if (!sql) {
     return NextResponse.json({ mode: "local" });
@@ -69,6 +104,162 @@ export async function GET() {
   try {
     await ensureNeonSchema();
 
+    if (clerkActive && identity) {
+      await claimUnownedLegacyBuildingsIfNeeded(sql, identity);
+      await activateMatchingInvites(sql, identity);
+
+      const emailMatchRows =
+        identity.emails.length > 0
+          ? await sql`
+              select * from syndic_memberships
+              where status != 'revoked'
+                and (clerk_user_id = ${identity.userId} or lower(email) = any(${identity.emails}))
+            `
+          : await sql`
+              select * from syndic_memberships
+              where status != 'revoked'
+                and clerk_user_id = ${identity.userId}
+            `;
+
+      const ownedRows = await sql`
+        select * from syndic_buildings where owner_id = ${identity.userId} order by created_at asc
+      `;
+
+      const myRoles: Record<string, MemberRole> = {};
+      for (const m of emailMatchRows) {
+        const bId = String(m.building_id);
+        const role = normalizeMemberRole(m.role);
+        const prev = myRoles[bId];
+        if (
+          !prev ||
+          role === "syndic" ||
+          (role === "assistant" && prev === "tenant")
+        ) {
+          myRoles[bId] = role;
+        }
+      }
+      for (const o of ownedRows) {
+        myRoles[String(o.id)] = "syndic";
+      }
+
+      const authorizedIds = Object.keys(myRoles);
+      if (authorizedIds.length === 0) {
+        return NextResponse.json({
+          mode: "neon",
+          user: {
+            id: identity.userId,
+            email: identity.primaryEmail,
+            name: identity.fullName,
+          },
+          myRoles: {},
+          buildings: [],
+          apartments: [],
+          payments: [],
+          expenses: [],
+          subscriptionRequests: [],
+          memberships: [],
+        });
+      }
+
+      const [bRows, aRows, pRows, eRows, sRows, mRows] = await Promise.all([
+        sql`select * from syndic_buildings where id = any(${authorizedIds}) order by created_at asc`,
+        sql`select * from syndic_apartments where building_id = any(${authorizedIds}) order by sort_order asc`,
+        sql`select * from syndic_payments where building_id = any(${authorizedIds}) order by paid_at desc`,
+        sql`select * from syndic_expenses where building_id = any(${authorizedIds}) order by expense_date desc, created_at desc`,
+        sql`select * from syndic_subscription_requests where building_id = any(${authorizedIds}) order by created_at desc`,
+        sql`select * from syndic_memberships where building_id = any(${authorizedIds}) order by created_at asc`,
+      ]);
+
+      const buildings = bRows.map((b) => mapBuilding(b as Record<string, unknown>));
+
+      const apartments: Apartment[] = aRows.map((a) => ({
+        id: String(a.id),
+        buildingId: String(a.building_id),
+        unitLabel: String(a.unit_label),
+        residentName: String(a.resident_name ?? ""),
+        phone: String(a.phone ?? ""),
+        monthlyFee: Number(a.monthly_fee),
+        billingCycle: normalizeBillingCycle(a.billing_cycle),
+        active: Boolean(a.active),
+        sortOrder: Number(a.sort_order ?? 1),
+      }));
+
+      const payments: Payment[] = pRows.map((p) => ({
+        id: String(p.id),
+        buildingId: String(p.building_id),
+        apartmentId: String(p.apartment_id),
+        monthKey: String(p.month_key),
+        amount: Number(p.amount),
+        method: p.method as Payment["method"],
+        receiptNumber: String(p.receipt_number),
+        note: String(p.note ?? ""),
+        paidAt: new Date(String(p.paid_at)).toISOString(),
+      }));
+
+      const expenses: Expense[] = eRows.map((e) => ({
+        id: String(e.id),
+        buildingId: String(e.building_id),
+        category: e.category as Expense["category"],
+        amount: Number(e.amount),
+        expenseDate: String(e.expense_date),
+        description: String(e.description),
+        receiptPhotoUrl: e.receipt_photo_url ? String(e.receipt_photo_url) : null,
+        createdAt: new Date(String(e.created_at)).toISOString(),
+      }));
+
+      const subscriptionRequests: SubscriptionRequest[] = sRows.map((s) => ({
+        id: String(s.id),
+        buildingId: String(s.building_id),
+        buildingName: String(s.building_name),
+        referenceCode: String(s.reference_code),
+        plan: s.plan as SubscriptionRequest["plan"],
+        amountMAD: Number(s.amount_mad),
+        channel: s.channel as SubscriptionRequest["channel"],
+        proofPhotoUrl: s.proof_photo_url ? String(s.proof_photo_url) : null,
+        note: String(s.note ?? ""),
+        status: s.status as SubscriptionRequest["status"],
+        createdAt: new Date(String(s.created_at)).toISOString(),
+      }));
+
+      const memberships: BuildingMembership[] = [];
+      for (const raw of mRows) {
+        const bId = String(raw.building_id);
+        const viewerRole = myRoles[bId];
+        if (!viewerRole) continue;
+        const rowRole = normalizeMemberRole(raw.role);
+        const rowEmail = String(raw.email ?? "").trim().toLowerCase();
+        const isSelf =
+          raw.clerk_user_id === identity.userId ||
+          identity.emails.includes(rowEmail);
+
+        if (viewerRole === "tenant" && !isSelf) continue;
+
+        const allowToken =
+          viewerRole === "syndic" ||
+          (viewerRole === "assistant" && rowRole === "tenant");
+        memberships.push(
+          mapMembershipRow(raw as Record<string, unknown>, allowToken)
+        );
+      }
+
+      return NextResponse.json({
+        mode: "neon",
+        user: {
+          id: identity.userId,
+          email: identity.primaryEmail,
+          name: identity.fullName,
+        },
+        myRoles,
+        buildings,
+        apartments,
+        payments,
+        expenses,
+        subscriptionRequests,
+        memberships,
+      });
+    }
+
+    // Unauthenticated local-dev / test fallback only when Clerk keys are absent
     const [bRows, aRows, pRows, eRows, sRows] = await Promise.all([
       sql`select * from syndic_buildings order by created_at asc`,
       sql`select * from syndic_apartments order by sort_order asc`,
@@ -77,25 +268,7 @@ export async function GET() {
       sql`select * from syndic_subscription_requests order by created_at desc`,
     ]);
 
-    const buildings: Building[] = bRows.map((b) => ({
-      id: String(b.id),
-      name: String(b.name),
-      city: String(b.city ?? ""),
-      defaultMonthlyFee: Number(b.default_monthly_fee),
-      openingBalance: Number(b.opening_balance),
-      startMonth: String(b.start_month),
-      rib: String(b.rib ?? ""),
-      shareSlug: String(b.share_slug),
-      sharePin: String(b.share_pin ?? ""),
-      showNamesPublicly: Boolean(b.show_names_publicly),
-      planStatus: b.plan_status as Building["planStatus"],
-      trialEndsAt: new Date(String(b.trial_ends_at)).toISOString(),
-      planExpiresAt: b.plan_expires_at
-        ? new Date(String(b.plan_expires_at)).toISOString()
-        : null,
-      createdAt: new Date(String(b.created_at)).toISOString(),
-    }));
-
+    const buildings = bRows.map((b) => mapBuilding(b as Record<string, unknown>));
     const apartments: Apartment[] = aRows.map((a) => ({
       id: String(a.id),
       buildingId: String(a.building_id),
@@ -107,7 +280,6 @@ export async function GET() {
       active: Boolean(a.active),
       sortOrder: Number(a.sort_order ?? 1),
     }));
-
     const payments: Payment[] = pRows.map((p) => ({
       id: String(p.id),
       buildingId: String(p.building_id),
@@ -119,7 +291,6 @@ export async function GET() {
       note: String(p.note ?? ""),
       paidAt: new Date(String(p.paid_at)).toISOString(),
     }));
-
     const expenses: Expense[] = eRows.map((e) => ({
       id: String(e.id),
       buildingId: String(e.building_id),
@@ -130,7 +301,6 @@ export async function GET() {
       receiptPhotoUrl: e.receipt_photo_url ? String(e.receipt_photo_url) : null,
       createdAt: new Date(String(e.created_at)).toISOString(),
     }));
-
     const subscriptionRequests: SubscriptionRequest[] = sRows.map((s) => ({
       id: String(s.id),
       buildingId: String(s.building_id),
@@ -147,11 +317,13 @@ export async function GET() {
 
     return NextResponse.json({
       mode: "neon",
+      myRoles: Object.fromEntries(buildings.map((b) => [b.id, "syndic" as const])),
       buildings,
       apartments,
       payments,
       expenses,
       subscriptionRequests,
+      memberships: [],
     });
   } catch (error) {
     return NextResponse.json(
@@ -187,20 +359,37 @@ export async function POST(request: Request) {
       ? (body.payload as Record<string, unknown>)
       : {};
 
-  if (PROTECTED_ADMIN_ACTIONS.has(action) && isClerkConfigured()) {
-    const userId = await getSignedInUserId();
-    if (!userId) {
-      return NextResponse.json(
-        { mode: "error", ok: false, error: "unauthorized" },
-        { status: 401 }
-      );
-    }
+  const clerkActive = isClerkServerConfigured();
+  const identity = clerkActive ? await getAuthenticatedClerkIdentity() : null;
+
+  if (clerkActive && !identity) {
+    return NextResponse.json(
+      { mode: "error", ok: false, error: "unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  if (PROTECTED_ADMIN_ACTIONS.has(action) && clerkActive && !identity) {
+    return NextResponse.json(
+      { mode: "error", ok: false, error: "unauthorized" },
+      { status: 401 }
+    );
   }
 
   const sql = getSql();
   if (!sql) {
     return NextResponse.json({ mode: "local", ok: true });
   }
+
+  const checkRole = async (
+    buildingId: string,
+    allowed: MemberRole[]
+  ): Promise<MemberRole | null> => {
+    if (!clerkActive || !identity) return "syndic";
+    const match = await getUserBuildingMembership(sql, buildingId, identity);
+    if (!match || !allowed.includes(match.role)) return null;
+    return match.role;
+  };
 
   try {
     await ensureNeonSchema();
@@ -210,7 +399,7 @@ export async function POST(request: Request) {
       if (!b || !b.id?.trim() || !b.name?.trim() || !b.shareSlug?.trim()) {
         return badRequest("invalid_building", "Building id, name and slug are required");
       }
-      const userId = await getSignedInUserId();
+      const userId = identity?.userId ?? null;
       const units = Array.isArray(payload.apartments)
         ? (payload.apartments as Apartment[])
         : [];
@@ -225,6 +414,23 @@ export async function POST(request: Request) {
           ${b.trialEndsAt}, ${b.planExpiresAt}, ${b.createdAt}
         ) on conflict (id) do nothing
       `;
+
+      if (identity) {
+        const ownerEmail = identity.primaryEmail || `${identity.userId}@clerk.local`;
+        const memId = `mem-${crypto.randomUUID().slice(0, 8)}`;
+        const token = crypto.randomUUID();
+        await sql`
+          insert into syndic_memberships (
+            id, building_id, email, clerk_user_id, role, display_name,
+            invite_token, status, invited_by, accepted_at
+          ) values (
+            ${memId}, ${b.id}, ${ownerEmail}, ${identity.userId}, 'syndic',
+            ${identity.fullName}, ${token}, 'active', ${identity.userId}, now()
+          )
+          on conflict (building_id, email) do nothing
+        `;
+      }
+
       for (const a of units) {
         if (!a?.id || !a?.unitLabel) continue;
         await sql`
@@ -241,6 +447,9 @@ export async function POST(request: Request) {
       if (!b || !b.id?.trim() || !b.name?.trim()) {
         return badRequest("invalid_building", "Building id and name are required");
       }
+      if (!(await checkRole(b.id, ["syndic", "assistant"]))) {
+        return forbidden();
+      }
       await sql`
         update syndic_buildings set
           name = ${b.name},
@@ -256,6 +465,15 @@ export async function POST(request: Request) {
           plan_expires_at = ${b.planExpiresAt}
         where id = ${b.id}
       `;
+    } else if (action === "delete_building") {
+      const buildingId = String(payload.buildingId ?? "").trim();
+      if (!buildingId) {
+        return badRequest("invalid_building_id", "buildingId is required");
+      }
+      if (!(await checkRole(buildingId, ["syndic"]))) {
+        return forbidden("Only the principal syndic can delete a building");
+      }
+      await sql`delete from syndic_buildings where id = ${buildingId}`;
     } else if (action === "add_apartments") {
       const units = Array.isArray(payload.apartments)
         ? (payload.apartments as Apartment[])
@@ -263,9 +481,16 @@ export async function POST(request: Request) {
       if (units.length === 0) {
         return badRequest("invalid_apartments", "At least one apartment is required");
       }
+      const targetBuildingId = String(units[0]?.buildingId ?? "").trim();
+      if (!targetBuildingId) {
+        return badRequest("invalid_apartment", "buildingId is required");
+      }
+      if (!(await checkRole(targetBuildingId, ["syndic", "assistant"]))) {
+        return forbidden();
+      }
       for (const a of units) {
-        if (!a?.id || !a?.buildingId || !a?.unitLabel) {
-          return badRequest("invalid_apartment", "Apartment id, buildingId and unitLabel are required");
+        if (!a?.id || !a?.buildingId || a.buildingId !== targetBuildingId || !a?.unitLabel) {
+          return badRequest("invalid_apartment", "Apartment id, consistent buildingId and unitLabel are required");
         }
         await sql`
           insert into syndic_apartments (
@@ -280,6 +505,15 @@ export async function POST(request: Request) {
       const a = payload.apartment as Apartment | undefined;
       if (!a || !a.id?.trim() || !a.unitLabel?.trim()) {
         return badRequest("invalid_apartment", "Apartment id and unitLabel are required");
+      }
+      const aRows = await sql`
+        select building_id from syndic_apartments where id = ${a.id} limit 1
+      `;
+      if (!aRows[0]) {
+        return badRequest("not_found", "Apartment not found");
+      }
+      if (!(await checkRole(String(aRows[0].building_id), ["syndic", "assistant"]))) {
+        return forbidden();
       }
       await sql`
         update syndic_apartments set
@@ -303,6 +537,9 @@ export async function POST(request: Request) {
       ) {
         return badRequest("invalid_payment", "Valid payment id, buildingId, apartmentId, monthKey and positive amount are required");
       }
+      if (!(await checkRole(p.buildingId, ["syndic", "assistant"]))) {
+        return forbidden();
+      }
       await sql`
         insert into syndic_payments (
           id, building_id, apartment_id, month_key, amount, method, receipt_number, note, paid_at
@@ -325,11 +562,18 @@ export async function POST(request: Request) {
       if (list.length === 0) {
         return badRequest("invalid_payments", "Non-empty payments array is required");
       }
+      const targetBuildingId = String(list[0]?.buildingId ?? "").trim();
+      if (!targetBuildingId) {
+        return badRequest("invalid_payment", "buildingId is required");
+      }
+      if (!(await checkRole(targetBuildingId, ["syndic", "assistant"]))) {
+        return forbidden();
+      }
       for (const p of list) {
         if (
           !p ||
           !p.id?.trim() ||
-          !p.buildingId?.trim() ||
+          p.buildingId !== targetBuildingId ||
           !p.apartmentId?.trim() ||
           !p.monthKey?.trim() ||
           !isPositiveFinite(p.amount)
@@ -352,18 +596,20 @@ export async function POST(request: Request) {
             paid_at = excluded.paid_at
         `;
       }
-    } else if (action === "delete_building") {
-      const buildingId = String(payload.buildingId ?? "").trim();
-      if (!buildingId) {
-        return badRequest("invalid_building_id", "buildingId is required");
-      }
-      await sql`delete from syndic_buildings where id = ${buildingId}`;
     } else if (action === "cancel_payment") {
       const paymentId = String(payload.paymentId ?? "").trim();
       if (!paymentId) {
         return badRequest("invalid_payment_id", "paymentId is required");
       }
-      await sql`delete from syndic_payments where id = ${paymentId}`;
+      const pRows = await sql`
+        select building_id from syndic_payments where id = ${paymentId} limit 1
+      `;
+      if (pRows[0]) {
+        if (!(await checkRole(String(pRows[0].building_id), ["syndic", "assistant"]))) {
+          return forbidden();
+        }
+        await sql`delete from syndic_payments where id = ${paymentId}`;
+      }
     } else if (action === "add_expense") {
       const e = payload.expense as Expense | undefined;
       if (
@@ -374,6 +620,9 @@ export async function POST(request: Request) {
         !isPositiveFinite(e.amount)
       ) {
         return badRequest("invalid_expense", "Expense id, buildingId, description and positive amount are required");
+      }
+      if (!(await checkRole(e.buildingId, ["syndic", "assistant"]))) {
+        return forbidden();
       }
       await sql`
         insert into syndic_expenses (
@@ -388,7 +637,15 @@ export async function POST(request: Request) {
       if (!expenseId) {
         return badRequest("invalid_expense_id", "expenseId is required");
       }
-      await sql`delete from syndic_expenses where id = ${expenseId}`;
+      const eRows = await sql`
+        select building_id from syndic_expenses where id = ${expenseId} limit 1
+      `;
+      if (eRows[0]) {
+        if (!(await checkRole(String(eRows[0].building_id), ["syndic", "assistant"]))) {
+          return forbidden();
+        }
+        await sql`delete from syndic_expenses where id = ${expenseId}`;
+      }
     } else if (action === "submit_subscription_request") {
       const r = payload.request as SubscriptionRequest | undefined;
       if (
@@ -398,6 +655,9 @@ export async function POST(request: Request) {
         !isPositiveFinite(r.amountMAD)
       ) {
         return badRequest("invalid_request", "Valid subscription request payload is required");
+      }
+      if (!(await checkRole(r.buildingId, ["syndic", "assistant"]))) {
+        return forbidden();
       }
       await sql`
         insert into syndic_subscription_requests (
@@ -418,8 +678,152 @@ export async function POST(request: Request) {
         update syndic_subscription_requests set status = ${status} where id = ${requestId}
       `;
     } else if (action === "reset_demo") {
-      await sql`truncate table syndic_subscription_requests, syndic_expenses, syndic_payments, syndic_apartments, syndic_buildings cascade`;
+      await sql`truncate table syndic_memberships, syndic_subscription_requests, syndic_expenses, syndic_payments, syndic_apartments, syndic_buildings cascade`;
       await seedNeonDatabase(sql);
+      if (identity) {
+        await claimUnownedLegacyBuildingsIfNeeded(sql, identity);
+      }
+    } else if (action === "invite_member") {
+      const buildingId = String(payload.buildingId ?? "").trim();
+      const email = String(payload.email ?? "").trim().toLowerCase();
+      const rawRole = String(payload.role ?? "tenant").trim().toLowerCase();
+      const apartmentId = payload.apartmentId
+        ? String(payload.apartmentId).trim()
+        : null;
+      const displayName = String(payload.displayName ?? "").trim();
+
+      if (!buildingId || !isValidEmail(email)) {
+        return badRequest("invalid_invite", "Valid buildingId and email address are required");
+      }
+      if (rawRole !== "assistant" && rawRole !== "tenant") {
+        return badRequest("invalid_role", "Invite role must be assistant or tenant");
+      }
+
+      const callerRole = await checkRole(
+        buildingId,
+        rawRole === "assistant" ? ["syndic"] : ["syndic", "assistant"]
+      );
+      if (!callerRole) {
+        return forbidden(
+          rawRole === "assistant"
+            ? "Only the principal syndic can invite building admins"
+            : "Insufficient permissions to invite members"
+        );
+      }
+
+      const existingRows = await sql`
+        select * from syndic_memberships
+        where building_id = ${buildingId} and lower(email) = ${email}
+        limit 1
+      `;
+      if (existingRows[0] && String(existingRows[0].role) === "syndic") {
+        return badRequest("cannot_downgrade_owner", "Cannot overwrite the principal syndic account");
+      }
+
+      const memId = existingRows[0]
+        ? String(existingRows[0].id)
+        : `mem-${crypto.randomUUID().slice(0, 8)}`;
+      const inviteToken = crypto.randomUUID();
+      const keepActive =
+        existingRows[0] && String(existingRows[0].status) === "active";
+
+      const upserted = await sql`
+        insert into syndic_memberships (
+          id, building_id, email, clerk_user_id, role, apartment_id,
+          display_name, invite_token, status, invited_by
+        ) values (
+          ${memId}, ${buildingId}, ${email},
+          ${keepActive ? String(existingRows[0].clerk_user_id ?? "") || null : null},
+          ${rawRole}, ${apartmentId || null}, ${displayName},
+          ${inviteToken}, ${keepActive ? "active" : "invited"},
+          ${identity?.userId ?? null}
+        )
+        on conflict (building_id, email) do update set
+          role = excluded.role,
+          apartment_id = excluded.apartment_id,
+          display_name = case when excluded.display_name <> '' then excluded.display_name else syndic_memberships.display_name end,
+          invite_token = case when syndic_memberships.status = 'active' then syndic_memberships.invite_token else excluded.invite_token end,
+          status = case when syndic_memberships.status = 'active' then 'active' else 'invited' end,
+          invited_by = excluded.invited_by
+        returning *
+      `;
+
+      return NextResponse.json({
+        mode: "neon",
+        ok: true,
+        membership: mapMembershipRow(upserted[0] as Record<string, unknown>, true),
+      });
+    } else if (action === "update_member_role") {
+      const membershipId = String(payload.membershipId ?? "").trim();
+      const rawRole = String(payload.role ?? "").trim().toLowerCase();
+      const hasApt = "apartmentId" in payload;
+      const apartmentId = payload.apartmentId
+        ? String(payload.apartmentId).trim()
+        : null;
+
+      if (!membershipId || (rawRole !== "assistant" && rawRole !== "tenant")) {
+        return badRequest("invalid_role_update", "Valid membershipId and assistant|tenant role required");
+      }
+
+      const mRows = await sql`
+        select * from syndic_memberships where id = ${membershipId} limit 1
+      `;
+      const target = mRows[0];
+      if (!target) {
+        return NextResponse.json({ mode: "error", ok: false, error: "not_found" }, { status: 404 });
+      }
+      if (String(target.role) === "syndic") {
+        return badRequest("cannot_modify_syndic", "Cannot change the principal syndic role");
+      }
+      if (!(await checkRole(String(target.building_id), ["syndic"]))) {
+        return forbidden("Only the principal syndic can change member roles");
+      }
+
+      const updated = hasApt
+        ? await sql`
+            update syndic_memberships
+            set role = ${rawRole}, apartment_id = ${apartmentId}
+            where id = ${membershipId}
+            returning *
+          `
+        : await sql`
+            update syndic_memberships
+            set role = ${rawRole}
+            where id = ${membershipId}
+            returning *
+          `;
+
+      return NextResponse.json({
+        mode: "neon",
+        ok: true,
+        membership: mapMembershipRow(updated[0] as Record<string, unknown>, true),
+      });
+    } else if (action === "revoke_member") {
+      const membershipId = String(payload.membershipId ?? "").trim();
+      if (!membershipId) {
+        return badRequest("invalid_membership_id", "membershipId is required");
+      }
+      const mRows = await sql`
+        select * from syndic_memberships where id = ${membershipId} limit 1
+      `;
+      const target = mRows[0];
+      if (!target) {
+        return NextResponse.json({ mode: "error", ok: false, error: "not_found" }, { status: 404 });
+      }
+      const targetRole = normalizeMemberRole(target.role);
+      if (targetRole === "syndic") {
+        return badRequest("cannot_revoke_syndic", "Cannot revoke the principal syndic");
+      }
+      const callerRole = await checkRole(
+        String(target.building_id),
+        targetRole === "assistant" ? ["syndic"] : ["syndic", "assistant"]
+      );
+      if (!callerRole) {
+        return forbidden();
+      }
+      await sql`
+        update syndic_memberships set status = 'revoked' where id = ${membershipId}
+      `;
     }
 
     return NextResponse.json({ mode: "neon", ok: true });

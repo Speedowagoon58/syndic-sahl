@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NeonQueryFunction } from "@neondatabase/serverless";
+import {
+  activateMatchingInvites,
+  claimUnownedLegacyBuildingsIfNeeded,
+  getAuthenticatedClerkIdentity,
+  getUserBuildingMembership,
+  isClerkServerConfigured,
+  type UserMembershipMatch,
+} from "@/lib/auth-server";
 import { normalizeBillingCycle } from "@/lib/calculations";
 import { ensureNeonSchema, getSql } from "@/lib/neon";
 
 async function buildSafePortalResponse(
   sql: NeonQueryFunction<false, false>,
-  building: Record<string, unknown>
+  building: Record<string, unknown>,
+  viewer?: UserMembershipMatch | null
 ) {
   const buildingId = String(building.id);
   const showNames = Boolean(building.show_names_publicly);
@@ -30,7 +39,7 @@ async function buildSafePortalResponse(
     `,
   ]);
 
-  // Server-side privacy enforcement: phone numbers are never returned; resident names stripped if show_names_publicly is false
+  // Privacy enforcement: phone numbers are never returned; resident names stripped if show_names_publicly is false
   const safeApartments = aRows.map((a) => ({
     id: String(a.id),
     buildingId: String(a.building_id),
@@ -68,7 +77,11 @@ async function buildSafePortalResponse(
 
   return NextResponse.json({
     mode: "cloud",
+    requiresAuth: false,
+    accessDenied: false,
     requiresPin: false,
+    viewerRole: viewer?.role ?? "tenant",
+    viewerApartmentId: viewer?.apartmentId ?? null,
     building: {
       id: buildingId,
       name: String(building.name),
@@ -116,9 +129,50 @@ export async function GET(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
+    const clerkActive = isClerkServerConfigured();
+    if (clerkActive) {
+      const identity = await getAuthenticatedClerkIdentity();
+      if (!identity) {
+        return NextResponse.json({
+          mode: "cloud",
+          requiresAuth: true,
+          buildingName: String(building.name),
+          city: String(building.city ?? ""),
+        });
+      }
+
+      await claimUnownedLegacyBuildingsIfNeeded(sql, identity);
+      await activateMatchingInvites(sql, identity);
+
+      const membership = await getUserBuildingMembership(
+        sql,
+        String(building.id),
+        identity
+      );
+      if (!membership) {
+        return NextResponse.json(
+          {
+            mode: "cloud",
+            requiresAuth: false,
+            accessDenied: true,
+            buildingName: String(building.name),
+            city: String(building.city ?? ""),
+            userEmail: identity.primaryEmail,
+          },
+          { status: 403 }
+        );
+      }
+
+      return buildSafePortalResponse(
+        sql,
+        building as Record<string, unknown>,
+        membership
+      );
+    }
+
+    // Local/offline PIN gate only when Clerk is not configured
     const requiredPin = String(building.share_pin ?? "").trim();
     if (requiredPin) {
-      // Return HTTP 200 for the initial PIN gate metadata so browsers do not log a 401 console error on first load.
       return NextResponse.json({
         mode: "cloud",
         requiresPin: true,
@@ -128,7 +182,7 @@ export async function GET(
       });
     }
 
-    return buildSafePortalResponse(sql, building);
+    return buildSafePortalResponse(sql, building as Record<string, unknown>);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Database error" },
@@ -167,6 +221,49 @@ export async function POST(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
+    const clerkActive = isClerkServerConfigured();
+    if (clerkActive) {
+      const identity = await getAuthenticatedClerkIdentity();
+      if (!identity) {
+        return NextResponse.json(
+          {
+            mode: "cloud",
+            requiresAuth: true,
+            buildingName: String(building.name),
+            city: String(building.city ?? ""),
+          },
+          { status: 401 }
+        );
+      }
+
+      await claimUnownedLegacyBuildingsIfNeeded(sql, identity);
+      await activateMatchingInvites(sql, identity);
+
+      const membership = await getUserBuildingMembership(
+        sql,
+        String(building.id),
+        identity
+      );
+      if (!membership) {
+        return NextResponse.json(
+          {
+            mode: "cloud",
+            accessDenied: true,
+            buildingName: String(building.name),
+            city: String(building.city ?? ""),
+            userEmail: identity.primaryEmail,
+          },
+          { status: 403 }
+        );
+      }
+
+      return buildSafePortalResponse(
+        sql,
+        building as Record<string, unknown>,
+        membership
+      );
+    }
+
     const submittedPin = String(body?.pin ?? "").trim();
     const requiredPin = String(building.share_pin ?? "").trim();
 
@@ -183,7 +280,7 @@ export async function POST(
       );
     }
 
-    return buildSafePortalResponse(sql, building);
+    return buildSafePortalResponse(sql, building as Record<string, unknown>);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Database error" },

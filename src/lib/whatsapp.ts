@@ -4,7 +4,7 @@ import {
   formatMonthLabel,
   getBillingCycleMonths,
 } from "./calculations";
-import type { BillingCycle, PlanDuration, WhatsAppLang } from "./types";
+import type { BillingCycle, MemberRole, PlanDuration, WhatsAppLang } from "./types";
 
 /**
  * Normalizes Moroccan phone numbers to E.164 digits without '+' (e.g. "06 12-34-56-78" -> "212612345678").
@@ -294,4 +294,57 @@ export function buildUpgradeConfirmationMessage(params: {
   }
   lines.push(`Merci d'activer notre compte ! (Ci-joint le reçu)`);
   return lines.join("\n");
+}
+
+export function buildMemberInviteMessage(params: {
+  lang: WhatsAppLang;
+  buildingName: string;
+  role: MemberRole;
+  inviteUrl: string;
+  recipientEmail: string;
+}): string {
+  const { lang, buildingName, role, inviteUrl, recipientEmail } = params;
+
+  if (lang === "ar") {
+    const roleLabel =
+      role === "assistant"
+        ? "مساعد السانديك (إدارة الأداءات والمصاريف)"
+        : "ساكن / مالك (الاطلاع على الحسابات والفواتير)";
+    return [
+      `السلام عليكم،`,
+      `تمت دعوتكم للولوج إلى الفضاء الخاص بإقامة *${buildingName}* على منصة ${APP_NAME}.`,
+      `• الصلاحية: ${roleLabel}`,
+      `• البريد المدعو: ${recipientEmail}`,
+      `اضغطوا على رابط الدعوة وسجلوا الدخول بحساب Google أو البريد الإلكتروني المذكور:`,
+      inviteUrl,
+    ].join("\n");
+  }
+
+  if (lang === "darija") {
+    const roleLabel =
+      role === "assistant"
+        ? "Adjoint / Administrateur dyal l-immeuble"
+        : "Résident / Copropriétaire";
+    return [
+      `Salam,`,
+      `Sifetna lik invitation bach tdkhel l-*${buildingName}* f ${APP_NAME} (accès privé).`,
+      `• Rôle : ${roleLabel}`,
+      `• E-mail li m-enviti : ${recipientEmail}`,
+      `Dkhoul mn had l-lien w t-connecta b Google wla had l-e-mail :`,
+      inviteUrl,
+    ].join("\n");
+  }
+
+  const roleLabel =
+    role === "assistant"
+      ? "Administrateur adjoint (paiements, dépenses & résidents)"
+      : "Résident / Copropriétaire (lecture seule)";
+  return [
+    `Bonjour,`,
+    `Vous êtes invité(e) à rejoindre l'espace privé de *${buildingName}* sur ${APP_NAME}.`,
+    `• Rôle : ${roleLabel}`,
+    `• E-mail invité : ${recipientEmail}`,
+    `Ouvrez ce lien et connectez-vous avec Google ou cette adresse e-mail :`,
+    inviteUrl,
+  ].join("\n");
 }

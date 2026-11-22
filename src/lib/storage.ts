@@ -34,6 +34,11 @@ export function loadAppData(): AppData {
       subscriptionRequests: Array.isArray(parsed.subscriptionRequests)
         ? parsed.subscriptionRequests
         : [],
+      memberships: Array.isArray(parsed.memberships) ? parsed.memberships : [],
+      myRoles:
+        parsed.myRoles && typeof parsed.myRoles === "object"
+          ? parsed.myRoles
+          : {},
     };
   } catch {
     return createSeedData();

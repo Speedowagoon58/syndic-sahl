@@ -348,5 +348,7 @@ export function createSeedData(now: Date = new Date()): AppData {
     payments,
     expenses,
     subscriptionRequests,
+    memberships: [],
+    myRoles: {},
   };
 }

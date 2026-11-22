@@ -12,13 +12,16 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Shield,
   Trash2,
   Upload,
+  UserPlus,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { computeBuildingSummary, normalizeBillingCycle } from "@/lib/calculations";
 import {
   buildGroupTransparencyMessage,
+  buildMemberInviteMessage,
   buildWhatsAppUrl,
 } from "@/lib/whatsapp";
 import type { BillingCycle } from "@/lib/types";
@@ -76,9 +79,11 @@ export function SettingsTab() {
     whatsappLang,
     data,
     activeBuilding,
+    activeBuildingRole,
     buildingApartments,
     buildingPayments,
     buildingExpenses,
+    buildingMemberships,
     selectedMonthKey,
     updateBuildingSettings,
     deleteBuilding,
@@ -86,6 +91,9 @@ export function SettingsTab() {
     bulkAddApartments,
     importApartmentsBatch,
     updateApartment,
+    inviteMember,
+    updateMemberRole,
+    revokeMember,
     adminSetBuildingExpired,
     adminRestoreBuildingTrial,
     resetDemoData,
@@ -129,6 +137,12 @@ export function SettingsTab() {
 
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [csvText, setCsvText] = useState("");
+
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<"assistant" | "tenant">("tenant");
+  const [inviteAptId, setInviteAptId] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   const parsedCsvUnits = useMemo(
     () => parseCsvLinesToUnits(csvText, activeBuilding.defaultMonthlyFee),
@@ -238,6 +252,27 @@ export function SettingsTab() {
     if (ok) {
       setCsvText("");
       setShowCsvImport(false);
+    }
+  };
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim() || inviteBusy) return;
+    setInviteBusy(true);
+    const effectiveRole =
+      activeBuildingRole === "syndic" ? inviteRole : "tenant";
+    const created = await inviteMember({
+      buildingId: activeBuilding.id,
+      email: inviteEmail.trim(),
+      role: effectiveRole,
+      apartmentId: inviteAptId || null,
+      displayName: inviteName.trim(),
+    });
+    setInviteBusy(false);
+    if (created) {
+      setInviteEmail("");
+      setInviteName("");
+      setInviteAptId("");
     }
   };
 
@@ -733,6 +768,265 @@ export function SettingsTab() {
         </div>
       </div>
 
+      {/* 3.5 Private Access & Invited Members (Syndic / Building Admins / Tenants) */}
+      {(activeBuildingRole === "syndic" || activeBuildingRole === "assistant") && (
+        <div className="rounded-xl border border-zinc-200/90 bg-white p-6 shadow-2xs space-y-5 dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+                <Shield className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                <span>{t.settings.membersTitle}</span>
+              </h2>
+              <p className="mt-1 max-w-2xl text-xs text-zinc-500 dark:text-zinc-400">
+                {t.settings.membersDesc}
+              </p>
+            </div>
+            <span className="rounded-md border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              {t.header.roleBadge[activeBuildingRole]}
+            </span>
+          </div>
+
+          <form
+            onSubmit={handleInviteMember}
+            className="grid grid-cols-1 gap-3 rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-950 sm:grid-cols-12"
+          >
+            <div className="sm:col-span-4">
+              <label className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                {t.settings.inviteEmailLabel} *
+              </label>
+              <input
+                type="email"
+                required
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder={t.settings.inviteEmailPlaceholder}
+                className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+              />
+            </div>
+
+            <div className="sm:col-span-3">
+              <label className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                {t.settings.inviteNameLabel}
+              </label>
+              <input
+                type="text"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                placeholder={t.settings.inviteNamePlaceholder}
+                className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                {t.settings.inviteRoleLabel}
+              </label>
+              <select
+                aria-label={t.settings.inviteRoleLabel}
+                value={activeBuildingRole === "syndic" ? inviteRole : "tenant"}
+                disabled={activeBuildingRole !== "syndic"}
+                onChange={(e) =>
+                  setInviteRole(
+                    e.target.value === "assistant" ? "assistant" : "tenant"
+                  )
+                }
+                className="w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-950 focus:border-zinc-900 focus:outline-none disabled:opacity-70 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                {activeBuildingRole === "syndic" && (
+                  <option value="assistant">{t.header.roleBadge.assistant}</option>
+                )}
+                <option value="tenant">{t.header.roleBadge.tenant}</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-3">
+              <label className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                {t.settings.inviteUnitLabel}
+              </label>
+              <select
+                aria-label={t.settings.inviteUnitLabel}
+                value={inviteAptId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setInviteAptId(id);
+                  if (!inviteName.trim() && id) {
+                    const matched = buildingApartments.find((a) => a.id === id);
+                    if (matched?.residentName) {
+                      setInviteName(matched.residentName);
+                    }
+                  }
+                }}
+                className="w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-950 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                <option value="">{t.settings.inviteNoUnitOption}</option>
+                {buildingApartments.map((apt) => (
+                  <option key={apt.id} value={apt.id}>
+                    {apt.unitLabel}
+                    {apt.residentName ? ` — ${apt.residentName}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-12 pt-1">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                {(activeBuildingRole === "syndic" ? inviteRole : "tenant") ===
+                "assistant"
+                  ? t.settings.roleHelpAssistant
+                  : t.settings.roleHelpTenant}
+              </p>
+              <button
+                type="submit"
+                disabled={inviteBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>{t.settings.inviteSubmitBtn}</span>
+              </button>
+            </div>
+          </form>
+
+          {buildingMemberships.length === 0 ? (
+            <p className="text-xs text-zinc-400 dark:text-zinc-500">
+              {t.settings.noMembersYet}
+            </p>
+          ) : (
+            <div className="divide-y divide-zinc-100 rounded-lg border border-zinc-200/90 dark:divide-zinc-800 dark:border-zinc-800">
+              {buildingMemberships.map((m) => {
+                const linkedApt = m.apartmentId
+                  ? buildingApartments.find((a) => a.id === m.apartmentId)
+                  : undefined;
+                const inviteUrl = m.inviteToken
+                  ? `${origin}/invite/${m.inviteToken}`
+                  : "";
+                const waInviteUrl = inviteUrl
+                  ? buildWhatsAppUrl(
+                      linkedApt?.phone,
+                      buildMemberInviteMessage({
+                        lang: whatsappLang,
+                        buildingName: activeBuilding.name,
+                        role: m.role,
+                        inviteUrl,
+                        recipientEmail: m.email,
+                      })
+                    )
+                  : "";
+                const canRevoke =
+                  m.role !== "syndic" &&
+                  (activeBuildingRole === "syndic" ||
+                    (activeBuildingRole === "assistant" && m.role === "tenant"));
+
+                return (
+                  <div
+                    key={m.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                          {m.displayName || m.email}
+                        </span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                            m.role === "syndic"
+                              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
+                              : m.role === "assistant"
+                              ? "bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+                              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                          }`}
+                        >
+                          {t.header.roleBadge[m.role]}
+                        </span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            m.status === "active"
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                          }`}
+                        >
+                          {t.settings.memberStatus[m.status]}
+                        </span>
+                        {linkedApt && (
+                          <span className="rounded border border-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
+                            {linkedApt.unitLabel}
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+                        {m.email}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {activeBuildingRole === "syndic" && m.role !== "syndic" && (
+                        <select
+                          aria-label={t.settings.inviteRoleLabel}
+                          value={m.role}
+                          onChange={(e) =>
+                            void updateMemberRole({
+                              membershipId: m.id,
+                              role:
+                                e.target.value === "assistant"
+                                  ? "assistant"
+                                  : "tenant",
+                            })
+                          }
+                          className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                        >
+                          <option value="assistant">
+                            {t.header.roleBadge.assistant}
+                          </option>
+                          <option value="tenant">{t.header.roleBadge.tenant}</option>
+                        </select>
+                      )}
+
+                      {inviteUrl && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(inviteUrl);
+                              showToast(t.settings.inviteLinkCopied);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          >
+                            <Copy className="h-3 w-3" />
+                            <span>{t.settings.inviteCopyLink}</span>
+                          </button>
+                          <a
+                            href={waInviteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          >
+                            <MessageCircle className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                            <span>{t.settings.inviteSendWa}</span>
+                          </a>
+                        </>
+                      )}
+
+                      {canRevoke && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(t.settings.inviteRevokeConfirm)) {
+                              void revokeMember(m.id);
+                            }
+                          }}
+                          className="rounded-md border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:bg-zinc-950 dark:text-red-400 dark:hover:bg-red-950/50"
+                        >
+                          {t.settings.inviteRevokeBtn}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 4. Developer / Founder & Danger Controls */}
       <div className="rounded-xl border border-zinc-200/80 bg-zinc-100/60 p-5 dark:border-zinc-800 dark:bg-[#111113]">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500 dark:text-zinc-400">
@@ -772,20 +1066,22 @@ export function SettingsTab() {
             <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
 
-          <button
-            type="button"
-            disabled={data.buildings.length <= 1}
-            onClick={() => {
-              if (data.buildings.length <= 1) return;
-              if (window.confirm(t.settings.deleteBuildingConfirm)) {
-                deleteBuilding(activeBuilding.id);
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-red-900/60 dark:bg-zinc-950 dark:text-red-400 dark:hover:bg-red-950/50"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>{t.settings.deleteBuildingBtn}</span>
-          </button>
+          {activeBuildingRole === "syndic" && (
+            <button
+              type="button"
+              disabled={data.buildings.length <= 1}
+              onClick={() => {
+                if (data.buildings.length <= 1) return;
+                if (window.confirm(t.settings.deleteBuildingConfirm)) {
+                  deleteBuilding(activeBuilding.id);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-red-900/60 dark:bg-zinc-950 dark:text-red-400 dark:hover:bg-red-950/50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>{t.settings.deleteBuildingBtn}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

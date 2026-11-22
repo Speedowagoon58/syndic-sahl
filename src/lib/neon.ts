@@ -51,6 +51,7 @@ export async function ensureNeonSchema(): Promise<void> {
       `;
 
       await sql`alter table syndic_buildings add column if not exists owner_id text`;
+      await sql`alter table syndic_buildings add column if not exists access_mode text not null default 'invite_only'`;
 
       await sql`
         create table if not exists syndic_apartments (
@@ -112,9 +113,30 @@ export async function ensureNeonSchema(): Promise<void> {
         )
       `;
 
+      await sql`
+        create table if not exists syndic_memberships (
+          id text primary key,
+          building_id text not null references syndic_buildings(id) on delete cascade,
+          email text not null,
+          clerk_user_id text,
+          role text not null,
+          apartment_id text references syndic_apartments(id) on delete set null,
+          display_name text not null default '',
+          invite_token text not null unique,
+          status text not null default 'invited',
+          invited_by text,
+          created_at timestamptz not null default now(),
+          accepted_at timestamptz,
+          unique (building_id, email)
+        )
+      `;
+
       await sql`create index if not exists idx_syndic_apt_building on syndic_apartments(building_id, sort_order)`;
       await sql`create index if not exists idx_syndic_pay_building on syndic_payments(building_id, month_key)`;
       await sql`create index if not exists idx_syndic_exp_building on syndic_expenses(building_id, expense_date desc)`;
+      await sql`create index if not exists idx_syndic_members_building on syndic_memberships(building_id)`;
+      await sql`create index if not exists idx_syndic_members_email on syndic_memberships(lower(email))`;
+      await sql`create index if not exists idx_syndic_members_user on syndic_memberships(clerk_user_id)`;
 
       // Auto-seed realistic Moroccan demo data if database is brand new
       const countRows = await sql`select count(*)::int as cnt from syndic_buildings`;

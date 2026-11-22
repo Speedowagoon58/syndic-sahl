@@ -32,9 +32,11 @@ import type {
   AppTab,
   BillingCycle,
   Building,
+  BuildingMembership,
   Expense,
   ExpenseCategory,
   Locale,
+  MemberRole,
   Payment,
   PaymentMethod,
   PlanDuration,
@@ -43,6 +45,23 @@ import type {
   ThemeMode,
   WhatsAppLang,
 } from "@/lib/types";
+
+const EMPTY_BUILDING_FALLBACK: Building = {
+  id: "",
+  name: "",
+  city: "",
+  defaultMonthlyFee: 200,
+  openingBalance: 0,
+  startMonth: "2026-01",
+  rib: "",
+  shareSlug: "",
+  sharePin: "",
+  showNamesPublicly: false,
+  planStatus: "trial",
+  trialEndsAt: "2026-12-31T00:00:00.000Z",
+  planExpiresAt: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
 
 const emptySubscribe = () => () => {};
 
@@ -82,6 +101,8 @@ interface CreateBuildingInput {
 
 interface AppContextValue {
   hydrated: boolean;
+  workspaceReady: boolean;
+  authRequired: boolean;
   cloudConnected: boolean;
   data: AppData;
   t: TranslationDict;
@@ -90,10 +111,13 @@ interface AppContextValue {
   whatsappLang: WhatsAppLang;
   activeTab: AppTab;
   selectedMonthKey: string;
+  hasBuildings: boolean;
   activeBuilding: Building;
+  activeBuildingRole: MemberRole;
   buildingApartments: Apartment[];
   buildingPayments: Payment[];
   buildingExpenses: Expense[];
+  buildingMemberships: BuildingMembership[];
   planAccess: PlanAccessInfo;
   toast: string | null;
   setActiveTab: (tab: AppTab) => void;
@@ -186,6 +210,19 @@ interface AppContextValue {
   adminActivateBuilding: (buildingId: string, months: number) => void;
   adminSetBuildingExpired: (buildingId: string) => void;
   adminRestoreBuildingTrial: (buildingId: string) => void;
+  inviteMember: (input: {
+    buildingId: string;
+    email: string;
+    role: "assistant" | "tenant";
+    apartmentId?: string | null;
+    displayName?: string;
+  }) => Promise<BuildingMembership | null>;
+  updateMemberRole: (input: {
+    membershipId: string;
+    role: "assistant" | "tenant";
+    apartmentId?: string | null;
+  }) => Promise<boolean>;
+  revokeMember: (membershipId: string) => Promise<boolean>;
   resetDemoData: () => void;
 }
 
@@ -200,6 +237,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [data, setData] = useState<AppData>(() => loadAppData());
   const [cloudConnected, setCloudConnected] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>("payments");
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() =>
     getCurrentMonthKey()
@@ -227,42 +266,67 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pathname.startsWith("/landing") ||
       pathname.startsWith("/sign-in") ||
       pathname.startsWith("/sign-up") ||
-      pathname.startsWith("/login");
-    if (skipWorkspaceFetch) return;
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/invite/");
+    if (skipWorkspaceFetch) {
+      queueMicrotask(() => setWorkspaceReady(true));
+      return;
+    }
 
     let active = true;
     fetch("/api/workspace")
       .then((res) => (res.ok ? res.json() : null))
       .then((remote) => {
-        if (
-          !active ||
-          !remote ||
-          remote.mode !== "neon" ||
-          !Array.isArray(remote.buildings) ||
-          remote.buildings.length === 0
-        ) {
+        if (!active || !remote) {
+          if (active) setWorkspaceReady(true);
           return;
         }
+        if (remote.mode === "auth_required") {
+          setAuthRequired(true);
+          setCloudConnected(false);
+          setData((prev) => ({
+            ...prev,
+            activeBuildingId: "",
+            buildings: [],
+            apartments: [],
+            payments: [],
+            expenses: [],
+            subscriptionRequests: [],
+            memberships: [],
+            myRoles: {},
+          }));
+          setWorkspaceReady(true);
+          return;
+        }
+        if (remote.mode !== "neon" || !Array.isArray(remote.buildings)) {
+          setWorkspaceReady(true);
+          return;
+        }
+        setAuthRequired(false);
         setCloudConnected(true);
         setData((prev) => {
-          const validActive = remote.buildings.some(
-            (b: Building) => b.id === prev.activeBuildingId
+          const remoteBuildings = remote.buildings as Building[];
+          const validActive = remoteBuildings.some(
+            (b) => b.id === prev.activeBuildingId
           )
             ? prev.activeBuildingId
-            : remote.buildings[0].id;
+            : remoteBuildings[0]?.id ?? "";
           return {
             ...prev,
             activeBuildingId: validActive,
-            buildings: remote.buildings,
+            buildings: remoteBuildings,
             apartments: remote.apartments ?? [],
             payments: remote.payments ?? [],
             expenses: remote.expenses ?? [],
             subscriptionRequests: remote.subscriptionRequests ?? [],
+            memberships: remote.memberships ?? [],
+            myRoles: remote.myRoles ?? {},
           };
         });
+        setWorkspaceReady(true);
       })
       .catch(() => {
-        // Fallback silently to local mode when offline or DB unavailable
+        if (active) setWorkspaceReady(true);
       });
 
     return () => {
@@ -272,47 +336,67 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    saveAppData(data);
+    if (!authRequired && workspaceReady) {
+      saveAppData(data);
+    }
     document.documentElement.lang = data.locale;
     document.documentElement.dir = data.locale === "ar" ? "rtl" : "ltr";
     document.documentElement.classList.toggle("dark", data.theme === "dark");
-  }, [data, hydrated]);
+  }, [authRequired, data, hydrated, workspaceReady]);
+
+  const hasBuildings = data.buildings.length > 0;
 
   const activeBuilding = useMemo(() => {
     return (
       data.buildings.find((b) => b.id === data.activeBuildingId) ??
-      data.buildings[0]
+      data.buildings[0] ??
+      EMPTY_BUILDING_FALLBACK
     );
   }, [data.buildings, data.activeBuildingId]);
 
+  const activeBuildingRole = useMemo<MemberRole>(() => {
+    if (!hasBuildings || !activeBuilding.id) return "syndic";
+    if (!cloudConnected) return "syndic";
+    return data.myRoles?.[activeBuilding.id] ?? "syndic";
+  }, [activeBuilding.id, cloudConnected, data.myRoles, hasBuildings]);
+
   const buildingApartments = useMemo(() => {
-    if (!activeBuilding) return [];
+    if (!hasBuildings || !activeBuilding.id) return [];
     return data.apartments
       .filter((a) => a.buildingId === activeBuilding.id)
       .sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [data.apartments, activeBuilding]);
+  }, [data.apartments, activeBuilding.id, hasBuildings]);
 
   const buildingPayments = useMemo(() => {
-    if (!activeBuilding) return [];
+    if (!hasBuildings || !activeBuilding.id) return [];
     return data.payments.filter((p) => p.buildingId === activeBuilding.id);
-  }, [data.payments, activeBuilding]);
+  }, [data.payments, activeBuilding.id, hasBuildings]);
 
   const buildingExpenses = useMemo(() => {
-    if (!activeBuilding) return [];
+    if (!hasBuildings || !activeBuilding.id) return [];
     return data.expenses
       .filter((e) => e.buildingId === activeBuilding.id)
       .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
-  }, [data.expenses, activeBuilding]);
+  }, [data.expenses, activeBuilding.id, hasBuildings]);
+
+  const buildingMemberships = useMemo(() => {
+    if (!hasBuildings || !activeBuilding.id) return [];
+    return (data.memberships ?? []).filter(
+      (m) => m.buildingId === activeBuilding.id && m.status !== "revoked"
+    );
+  }, [data.memberships, activeBuilding.id, hasBuildings]);
 
   const activeUnitsCount = useMemo(
     () => buildingApartments.filter((a) => a.active).length,
     [buildingApartments]
   );
 
-  const planAccess = useMemo(
-    () => getPlanAccess(activeBuilding, activeUnitsCount),
-    [activeBuilding, activeUnitsCount]
-  );
+  const planAccess = useMemo(() => {
+    if (!hasBuildings) {
+      return { mode: "free_tier" as const, isReadOnly: false, daysRemaining: 0 };
+    }
+    return getPlanAccess(activeBuilding, activeUnitsCount);
+  }, [activeBuilding, activeUnitsCount, hasBuildings]);
 
   const t = translations[data.locale];
 
@@ -321,13 +405,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [cloudConnected, showToast, t.common.syncErrorToast]);
 
   const guardWritable = useCallback((): boolean => {
+    if (!hasBuildings) return false;
+    if (activeBuildingRole === "tenant") return false;
     if (planAccess.isReadOnly) {
       showToast(t.common.readOnlyToast);
       setActiveTab("subscription");
       return false;
     }
     return true;
-  }, [planAccess.isReadOnly, showToast, t.common.readOnlyToast]);
+  }, [activeBuildingRole, hasBuildings, planAccess.isReadOnly, showToast, t.common.readOnlyToast]);
 
   const setLocale = useCallback((locale: Locale) => {
     setData((prev) => ({ ...prev, locale }));
@@ -392,6 +478,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeBuildingId: buildingId,
         buildings: [...prev.buildings, newBuilding],
         apartments: [...prev.apartments, ...newApartments],
+        myRoles: {
+          ...(prev.myRoles ?? {}),
+          [buildingId]: "syndic",
+        },
       }));
 
       syncWorkspaceAction(
@@ -408,26 +498,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteBuilding = useCallback(
     (buildingId: string): boolean => {
       if (data.buildings.length <= 1) return false;
+      if (cloudConnected && data.myRoles?.[buildingId] !== "syndic") {
+        return false;
+      }
       const remaining = data.buildings.filter((b) => b.id !== buildingId);
-      setData((prev) => ({
-        ...prev,
-        activeBuildingId:
-          prev.activeBuildingId === buildingId
-            ? remaining[0]?.id ?? ""
-            : prev.activeBuildingId,
-        buildings: prev.buildings.filter((b) => b.id !== buildingId),
-        apartments: prev.apartments.filter((a) => a.buildingId !== buildingId),
-        payments: prev.payments.filter((p) => p.buildingId !== buildingId),
-        expenses: prev.expenses.filter((e) => e.buildingId !== buildingId),
-        subscriptionRequests: prev.subscriptionRequests.filter(
-          (r) => r.buildingId !== buildingId
-        ),
-      }));
+      setData((prev) => {
+        const nextRoles = { ...(prev.myRoles ?? {}) };
+        delete nextRoles[buildingId];
+        return {
+          ...prev,
+          activeBuildingId:
+            prev.activeBuildingId === buildingId
+              ? remaining[0]?.id ?? ""
+              : prev.activeBuildingId,
+          buildings: prev.buildings.filter((b) => b.id !== buildingId),
+          apartments: prev.apartments.filter((a) => a.buildingId !== buildingId),
+          payments: prev.payments.filter((p) => p.buildingId !== buildingId),
+          expenses: prev.expenses.filter((e) => e.buildingId !== buildingId),
+          subscriptionRequests: prev.subscriptionRequests.filter(
+            (r) => r.buildingId !== buildingId
+          ),
+          memberships: (prev.memberships ?? []).filter(
+            (m) => m.buildingId !== buildingId
+          ),
+          myRoles: nextRoles,
+        };
+      });
       syncWorkspaceAction("delete_building", { buildingId }, handleSyncError);
       showToast(t.common.saved);
       return true;
     },
-    [data.buildings, handleSyncError, showToast, t.common.saved]
+    [cloudConnected, data.buildings, data.myRoles, handleSyncError, showToast, t.common.saved]
   );
 
   const updateBuildingSettings = useCallback(
@@ -989,6 +1090,168 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [data.buildings, handleSyncError, showToast, t.common.saved]
   );
 
+  const inviteMember = useCallback(
+    async (input: {
+      buildingId: string;
+      email: string;
+      role: "assistant" | "tenant";
+      apartmentId?: string | null;
+      displayName?: string;
+    }): Promise<BuildingMembership | null> => {
+      if (!guardWritable()) return null;
+      const email = input.email.trim().toLowerCase();
+      if (!email) return null;
+
+      try {
+        if (cloudConnected) {
+          const res = await fetch("/api/workspace", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "invite_member",
+              payload: {
+                buildingId: input.buildingId,
+                email,
+                role: input.role,
+                apartmentId: input.apartmentId ?? null,
+                displayName: input.displayName ?? "",
+              },
+            }),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.membership) {
+            showToast(json?.message || t.common.syncErrorToast);
+            return null;
+          }
+          const created = json.membership as BuildingMembership;
+          setData((prev) => ({
+            ...prev,
+            memberships: [
+              ...(prev.memberships ?? []).filter((m) => m.id !== created.id),
+              created,
+            ],
+          }));
+          showToast(t.settings.inviteCreatedToast);
+          return created;
+        }
+      } catch {
+        showToast(t.common.syncErrorToast);
+        return null;
+      }
+
+      // Offline / local fallback
+      const localMember: BuildingMembership = {
+        id: createId("mem"),
+        buildingId: input.buildingId,
+        email,
+        clerkUserId: null,
+        role: input.role,
+        apartmentId: input.apartmentId ?? null,
+        displayName: input.displayName?.trim() ?? "",
+        inviteToken: createId("tok"),
+        status: "invited",
+        invitedBy: null,
+        createdAt: new Date().toISOString(),
+        acceptedAt: null,
+      };
+      setData((prev) => ({
+        ...prev,
+        memberships: [
+          ...(prev.memberships ?? []).filter(
+            (m) => !(m.buildingId === input.buildingId && m.email === email)
+          ),
+          localMember,
+        ],
+      }));
+      showToast(t.settings.inviteCreatedToast);
+      return localMember;
+    },
+    [cloudConnected, guardWritable, showToast, t.common.syncErrorToast, t.settings.inviteCreatedToast]
+  );
+
+  const updateMemberRole = useCallback(
+    async (input: {
+      membershipId: string;
+      role: "assistant" | "tenant";
+      apartmentId?: string | null;
+    }): Promise<boolean> => {
+      if (!guardWritable()) return false;
+      try {
+        if (cloudConnected) {
+          const res = await fetch("/api/workspace", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "update_member_role",
+              payload: input,
+            }),
+          });
+          if (!res.ok) {
+            showToast(t.common.syncErrorToast);
+            return false;
+          }
+        }
+      } catch {
+        showToast(t.common.syncErrorToast);
+        return false;
+      }
+
+      setData((prev) => ({
+        ...prev,
+        memberships: (prev.memberships ?? []).map((m) =>
+          m.id === input.membershipId
+            ? {
+                ...m,
+                role: input.role,
+                apartmentId:
+                  input.apartmentId !== undefined
+                    ? input.apartmentId
+                    : m.apartmentId,
+              }
+            : m
+        ),
+      }));
+      showToast(t.common.saved);
+      return true;
+    },
+    [cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+  );
+
+  const revokeMember = useCallback(
+    async (membershipId: string): Promise<boolean> => {
+      if (!guardWritable()) return false;
+      try {
+        if (cloudConnected) {
+          const res = await fetch("/api/workspace", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "revoke_member",
+              payload: { membershipId },
+            }),
+          });
+          if (!res.ok) {
+            showToast(t.common.syncErrorToast);
+            return false;
+          }
+        }
+      } catch {
+        showToast(t.common.syncErrorToast);
+        return false;
+      }
+
+      setData((prev) => ({
+        ...prev,
+        memberships: (prev.memberships ?? []).filter(
+          (m) => m.id !== membershipId
+        ),
+      }));
+      showToast(t.common.saved);
+      return true;
+    },
+    [cloudConnected, guardWritable, showToast, t.common.saved, t.common.syncErrorToast]
+  );
+
   const resetDemoData = useCallback(() => {
     const fresh = resetDemoAppData();
     setData(fresh);
@@ -1000,6 +1263,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AppContextValue>(
     () => ({
       hydrated,
+      workspaceReady,
+      authRequired,
       cloudConnected,
       data,
       t,
@@ -1008,10 +1273,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       whatsappLang: data.whatsappLang,
       activeTab,
       selectedMonthKey,
+      hasBuildings,
       activeBuilding,
+      activeBuildingRole,
       buildingApartments,
       buildingPayments,
       buildingExpenses,
+      buildingMemberships,
       planAccess,
       toast,
       setActiveTab,
@@ -1039,19 +1307,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       adminActivateBuilding,
       adminSetBuildingExpired,
       adminRestoreBuildingTrial,
+      inviteMember,
+      updateMemberRole,
+      revokeMember,
       resetDemoData,
     }),
     [
       hydrated,
+      workspaceReady,
+      authRequired,
       cloudConnected,
       data,
       t,
       activeTab,
       selectedMonthKey,
+      hasBuildings,
       activeBuilding,
+      activeBuildingRole,
       buildingApartments,
       buildingPayments,
       buildingExpenses,
+      buildingMemberships,
       planAccess,
       toast,
       setLocale,
@@ -1077,6 +1353,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       adminActivateBuilding,
       adminSetBuildingExpired,
       adminRestoreBuildingTrial,
+      inviteMember,
+      updateMemberRole,
+      revokeMember,
       resetDemoData,
     ]
   );

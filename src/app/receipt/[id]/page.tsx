@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Moon, Printer, Sun } from "lucide-react";
+import { ArrowLeft, Lock, Moon, Printer, Sun } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { APP_NAME } from "@/lib/config";
 import {
@@ -31,6 +31,9 @@ export default function ReceiptPage() {
   const [cloudReceipt, setCloudReceipt] = useState<CloudReceiptPayload | null>(
     null
   );
+  const [cloudError, setCloudError] = useState<
+    "none" | "auth_required" | "forbidden"
+  >("none");
 
   useEffect(() => {
     if (!hydrated || !paymentId) return;
@@ -38,6 +41,18 @@ export default function ReceiptPage() {
     fetch(`/api/receipt/${encodeURIComponent(paymentId)}`)
       .then(async (res) => {
         if (!active) return;
+        if (res.status === 401) {
+          setCloudMode("cloud");
+          setCloudError("auth_required");
+          setCloudLoading(false);
+          return;
+        }
+        if (res.status === 403) {
+          setCloudMode("cloud");
+          setCloudError("forbidden");
+          setCloudLoading(false);
+          return;
+        }
         if (res.status === 404) {
           setCloudMode("cloud");
           setCloudReceipt(null);
@@ -72,6 +87,45 @@ export default function ReceiptPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400 dark:bg-[#09090B]">
         {t.common.loading}
+      </div>
+    );
+  }
+
+  if (cloudError !== "none") {
+    const redirectParam = encodeURIComponent(`/receipt/${paymentId}`);
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-6 text-center dark:bg-[#09090B]">
+        <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-7 dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+            <Lock className="h-4 w-4" />
+          </div>
+          <h1 className="mt-4 text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+            {cloudError === "auth_required"
+              ? t.receipt.authRequiredTitle
+              : t.receipt.forbiddenTitle}
+          </h1>
+          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            {cloudError === "auth_required"
+              ? t.receipt.authRequiredDesc
+              : t.receipt.forbiddenDesc}
+          </p>
+          {cloudError === "auth_required" ? (
+            <Link
+              href={`/sign-in?redirect_url=${redirectParam}`}
+              className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950"
+            >
+              {t.common.signInBtn}
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-950"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              {t.portal.backHome}
+            </Link>
+          )}
+        </div>
       </div>
     );
   }

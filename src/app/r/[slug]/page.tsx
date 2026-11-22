@@ -15,6 +15,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { AuthControls } from "@/components/AuthControls";
 import { APP_NAME, APP_NAME_AR } from "@/lib/config";
 import {
   computeApartmentArrears,
@@ -26,13 +27,15 @@ import {
   shiftMonthKey,
 } from "@/lib/calculations";
 import { ReceiptLightbox } from "@/components/ReceiptLightbox";
-import type { Apartment, Building, Expense, Payment } from "@/lib/types";
+import type { Apartment, Building, Expense, MemberRole, Payment } from "@/lib/types";
 
 interface CloudPortalPayload {
   building: Building;
   apartments: Apartment[];
   payments: Payment[];
   expenses: Expense[];
+  viewerRole?: MemberRole;
+  viewerApartmentId?: string | null;
 }
 
 export default function PublicResidentPortalPage() {
@@ -56,6 +59,12 @@ export default function PublicResidentPortalPage() {
   );
   const [cloudData, setCloudData] = useState<CloudPortalPayload | null>(null);
   const [cloudNotFound, setCloudNotFound] = useState(false);
+  const [cloudAuthGate, setCloudAuthGate] = useState<{
+    kind: "auth_required" | "access_denied";
+    buildingName: string;
+    city: string;
+    userEmail?: string;
+  } | null>(null);
   const [cloudPinRequired, setCloudPinRequired] = useState<{
     buildingName: string;
     city: string;
@@ -131,6 +140,27 @@ export default function PublicResidentPortalPage() {
           setCloudLoading(false);
           return;
         }
+        if (json.requiresAuth) {
+          setCloudMode("cloud");
+          setCloudAuthGate({
+            kind: "auth_required",
+            buildingName: json.buildingName ?? slug,
+            city: json.city ?? "",
+          });
+          setCloudLoading(false);
+          return;
+        }
+        if (res.status === 403 && json.accessDenied) {
+          setCloudMode("cloud");
+          setCloudAuthGate({
+            kind: "access_denied",
+            buildingName: json.buildingName ?? slug,
+            city: json.city ?? "",
+            userEmail: json.userEmail ?? "",
+          });
+          setCloudLoading(false);
+          return;
+        }
         if (json.requiresPin) {
           setCloudMode("cloud");
           setCloudPinRequired({
@@ -148,6 +178,8 @@ export default function PublicResidentPortalPage() {
             apartments: json.apartments ?? [],
             payments: json.payments ?? [],
             expenses: json.expenses ?? [],
+            viewerRole: json.viewerRole,
+            viewerApartmentId: json.viewerApartmentId ?? null,
           });
         }
         setCloudLoading(false);
@@ -214,6 +246,65 @@ export default function PublicResidentPortalPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400 dark:bg-[#09090B]">
         {t.common.loading}
+      </div>
+    );
+  }
+
+  if (cloudMode === "cloud" && cloudAuthGate) {
+    const redirectParam = encodeURIComponent(`/r/${slug}`);
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F6F4] p-4 dark:bg-[#09090B]">
+        <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+            <Lock className="h-4 w-4" />
+          </div>
+          <p className="mt-3 text-xs font-medium text-zinc-400">
+            {cloudAuthGate.buildingName}
+            {cloudAuthGate.city ? ` • ${cloudAuthGate.city}` : ""}
+          </p>
+          <h1 className="mt-1 text-base font-semibold text-zinc-950 dark:text-zinc-100">
+            {cloudAuthGate.kind === "auth_required"
+              ? t.portal.privateLockTitle
+              : t.portal.accessDeniedTitle}
+          </h1>
+          <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            {cloudAuthGate.kind === "auth_required"
+              ? t.portal.privateLockDesc
+              : t.portal.accessDeniedDesc}
+          </p>
+
+          {cloudAuthGate.kind === "auth_required" ? (
+            <div className="mt-5 space-y-2">
+              <Link
+                href={`/sign-in?redirect_url=${redirectParam}`}
+                className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+              >
+                {t.portal.privateLockBtn}
+              </Link>
+              <Link
+                href={`/sign-up?redirect_url=${redirectParam}`}
+                className="flex w-full items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                {t.common.signUpBtn}
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-5 flex flex-col items-center gap-3">
+              {cloudAuthGate.userEmail && (
+                <p className="font-mono text-[11px] text-zinc-400">
+                  {cloudAuthGate.userEmail}
+                </p>
+              )}
+              <AuthControls variant="header" />
+              <Link
+                href="/"
+                className="text-xs font-medium text-zinc-700 underline hover:text-zinc-950 dark:text-zinc-300"
+              >
+                {t.portal.backHome}
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -373,6 +464,7 @@ export default function PublicResidentPortalPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <AuthControls variant="header" />
             <button
               type="button"
               onClick={toggleTheme}
@@ -498,6 +590,7 @@ export default function PublicResidentPortalPage() {
           <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
             {apartments.map((apt) => {
               const isPaid = paidSet.has(apt.id);
+              const isViewerUnit = cloudData?.viewerApartmentId === apt.id;
               const arrears = computeApartmentArrears(
                 apt,
                 payments,
@@ -507,14 +600,25 @@ export default function PublicResidentPortalPage() {
               return (
                 <div
                   key={apt.id}
-                  className="rounded-lg border border-zinc-200/80 bg-zinc-50/40 p-3 dark:border-zinc-800 dark:bg-zinc-900/50"
+                  className={`rounded-lg border p-3 ${
+                    isViewerUnit
+                      ? "border-zinc-900 bg-white ring-1 ring-zinc-900 dark:border-zinc-200 dark:bg-zinc-900 dark:ring-zinc-200"
+                      : "border-zinc-200/80 bg-zinc-50/40 dark:border-zinc-800 dark:bg-zinc-900/50"
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                      {apt.unitLabel}
-                    </span>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                        {apt.unitLabel}
+                      </span>
+                      {isViewerUnit && (
+                        <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[9px] font-medium text-white dark:bg-zinc-100 dark:text-zinc-950">
+                          {t.portal.yourUnitBadge}
+                        </span>
+                      )}
+                    </div>
                     <span
-                      className={`h-2 w-2 rounded-full ${
+                      className={`h-2 w-2 shrink-0 rounded-full ${
                         isPaid ? "bg-emerald-600" : "bg-red-500"
                       }`}
                     />
