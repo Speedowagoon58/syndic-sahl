@@ -30,6 +30,7 @@ import type {
   Apartment,
   AppData,
   AppTab,
+  BillingCycle,
   Building,
   Expense,
   ExpenseCategory,
@@ -75,6 +76,7 @@ interface CreateBuildingInput {
     residentName: string;
     phone: string;
     monthlyFee: number;
+    billingCycle?: BillingCycle;
   }[];
 }
 
@@ -124,6 +126,7 @@ interface AppContextValue {
     residentName: string;
     phone: string;
     monthlyFee: number;
+    billingCycle?: BillingCycle;
   }) => boolean;
   bulkAddApartments: (input: {
     prefix: string;
@@ -137,12 +140,16 @@ interface AppContextValue {
       residentName: string;
       phone: string;
       monthlyFee: number;
+      billingCycle?: BillingCycle;
     }[]
   ) => boolean;
   updateApartment: (
     apartmentId: string,
     patch: Partial<
-      Pick<Apartment, "unitLabel" | "residentName" | "phone" | "monthlyFee" | "active">
+      Pick<
+        Apartment,
+        "unitLabel" | "residentName" | "phone" | "monthlyFee" | "billingCycle" | "active"
+      >
     >
   ) => boolean;
   recordPayment: (input: {
@@ -375,6 +382,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         residentName: u.residentName.trim(),
         phone: u.phone.trim(),
         monthlyFee: Math.max(0, Number(u.monthlyFee) || newBuilding.defaultMonthlyFee),
+        billingCycle: u.billingCycle ?? "monthly",
         active: true,
         sortOrder: idx + 1,
       }));
@@ -466,6 +474,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       residentName: string;
       phone: string;
       monthlyFee: number;
+      billingCycle?: BillingCycle;
     }): boolean => {
       if (!guardWritable()) return false;
       const maxOrder = buildingApartments.reduce(
@@ -479,6 +488,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         residentName: input.residentName.trim(),
         phone: input.phone.trim(),
         monthlyFee: Math.max(0, Number(input.monthlyFee) || activeBuilding.defaultMonthlyFee),
+        billingCycle: input.billingCycle ?? "monthly",
         active: true,
         sortOrder: maxOrder + 1,
       };
@@ -519,6 +529,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             0,
             Number(input.monthlyFee) || activeBuilding.defaultMonthlyFee
           ),
+          billingCycle: "monthly",
           active: true,
           sortOrder: maxOrder + i + 1,
         });
@@ -541,6 +552,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         residentName: string;
         phone: string;
         monthlyFee: number;
+        billingCycle?: BillingCycle;
       }[]
     ): boolean => {
       if (!guardWritable()) return false;
@@ -559,6 +571,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           0,
           Number(u.monthlyFee) || activeBuilding.defaultMonthlyFee
         ),
+        billingCycle: u.billingCycle ?? "monthly",
         active: true,
         sortOrder: maxOrder + idx + 1,
       }));
@@ -579,7 +592,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       patch: Partial<
         Pick<
           Apartment,
-          "unitLabel" | "residentName" | "phone" | "monthlyFee" | "active"
+          "unitLabel" | "residentName" | "phone" | "monthlyFee" | "billingCycle" | "active"
         >
       >
     ): boolean => {

@@ -1,6 +1,7 @@
 export type Locale = "fr" | "ar";
 export type ThemeMode = "light" | "dark";
 export type WhatsAppLang = "darija" | "fr" | "ar";
+export type BillingCycle = "monthly" | "quarterly" | "annual";
 export type PaymentMethod = "cash" | "virement" | "cheque";
 export type ExpenseCategory =
   | "gardiennage"
@@ -39,6 +40,7 @@ export interface Apartment {
   residentName: string;
   phone: string;
   monthlyFee: number;
+  billingCycle?: BillingCycle;
   active: boolean;
   sortOrder: number;
 }

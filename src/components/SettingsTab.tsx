@@ -16,11 +16,12 @@ import {
   Upload,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { computeBuildingSummary } from "@/lib/calculations";
+import { computeBuildingSummary, normalizeBillingCycle } from "@/lib/calculations";
 import {
   buildGroupTransparencyMessage,
   buildWhatsAppUrl,
 } from "@/lib/whatsapp";
+import type { BillingCycle } from "@/lib/types";
 
 function parseCsvLinesToUnits(
   rawText: string,
@@ -30,6 +31,7 @@ function parseCsvLinesToUnits(
   residentName: string;
   phone: string;
   monthlyFee: number;
+  billingCycle: BillingCycle;
 }[] {
   const lines = rawText
     .split(/\r?\n/)
@@ -41,6 +43,7 @@ function parseCsvLinesToUnits(
     residentName: string;
     phone: string;
     monthlyFee: number;
+    billingCycle: BillingCycle;
   }[] = [];
 
   for (const line of lines) {
@@ -59,8 +62,9 @@ function parseCsvLinesToUnits(
     const parsedFee = parts[3] ? Number(parts[3].replace(/[^\d.]/g, "")) : NaN;
     const monthlyFee =
       !Number.isNaN(parsedFee) && parsedFee > 0 ? parsedFee : defaultFee;
+    const billingCycle = normalizeBillingCycle(parts[4]);
 
-    units.push({ unitLabel, residentName, phone, monthlyFee });
+    units.push({ unitLabel, residentName, phone, monthlyFee, billingCycle });
   }
 
   return units;
@@ -116,6 +120,7 @@ export function SettingsTab() {
   const [newResident, setNewResident] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newFee, setNewFee] = useState(activeBuilding.defaultMonthlyFee);
+  const [newCycle, setNewCycle] = useState<BillingCycle>("monthly");
 
   const [showBulk, setShowBulk] = useState(false);
   const [bulkPrefix, setBulkPrefix] = useState("Apt");
@@ -174,11 +179,13 @@ export function SettingsTab() {
       residentName: newResident,
       phone: newPhone,
       monthlyFee: Number(newFee) || activeBuilding.defaultMonthlyFee,
+      billingCycle: newCycle,
     });
     if (ok) {
       setNewLabel("");
       setNewResident("");
       setNewPhone("");
+      setNewCycle("monthly");
     }
   };
 
@@ -209,11 +216,11 @@ export function SettingsTab() {
 
   const handleDownloadSampleCsv = () => {
     const sample = [
-      "Lot;Nom du coproprietaire;Telephone WhatsApp;Cotisation MAD",
-      "Apt 1;M. Karim Benali;0661234501;250",
-      "Apt 2;Mme Nadia El Fassi;0661234502;250",
-      "Apt 3;M. Youssef Tazi;0662345603;250",
-      "Magasin RDC;Pharmacie Al Amal;0661987612;400",
+      "Lot;Nom du coproprietaire;Telephone WhatsApp;Cotisation MAD;Frequence",
+      "Apt 1;M. Karim Benali;0661234501;250;mensuel",
+      "Apt 2;Mme Nadia El Fassi;0661234502;250;mensuel",
+      "Apt 3;M. Youssef Tazi;0662345603;250;trimestriel",
+      "Magasin RDC;Pharmacie Al Amal;0661987612;400;annuel",
     ].join("\n");
     const blob = new Blob([sample], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -576,7 +583,7 @@ export function SettingsTab() {
         {/* Quick Add Single Apartment */}
         <form
           onSubmit={handleAddApartment}
-          className="grid grid-cols-1 gap-2 rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-2.5 dark:border-zinc-800 dark:bg-zinc-950 sm:grid-cols-5"
+          className="grid grid-cols-1 gap-2 rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-2.5 dark:border-zinc-800 dark:bg-zinc-950 sm:grid-cols-12"
         >
           <input
             type="text"
@@ -584,23 +591,33 @@ export function SettingsTab() {
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
             placeholder={t.settings.unitLabel}
-            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 sm:col-span-2"
           />
           <input
             type="text"
             value={newResident}
             onChange={(e) => setNewResident(e.target.value)}
             placeholder={t.settings.residentName}
-            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 sm:col-span-2"
+            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 sm:col-span-3"
           />
           <input
             type="text"
             value={newPhone}
             onChange={(e) => setNewPhone(e.target.value)}
             placeholder={t.settings.phone}
-            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 sm:col-span-2"
           />
-          <div className="flex gap-1.5">
+          <select
+            aria-label={t.settings.billingCycle}
+            value={newCycle}
+            onChange={(e) => setNewCycle(normalizeBillingCycle(e.target.value))}
+            className="rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-950 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 sm:col-span-2"
+          >
+            <option value="monthly">{t.payments.cycleShort.monthly}</option>
+            <option value="quarterly">{t.payments.cycleShort.quarterly}</option>
+            <option value="annual">{t.payments.cycleShort.annual}</option>
+          </select>
+          <div className="flex gap-1.5 sm:col-span-3">
             <input
               type="number"
               min={0}
@@ -638,7 +655,7 @@ export function SettingsTab() {
                   className="w-full rounded-md border border-zinc-200/80 bg-zinc-50/50 px-2.5 py-1 text-xs font-semibold text-zinc-900 focus:bg-white focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:bg-zinc-950 dark:focus:border-zinc-400"
                 />
               </div>
-              <div className="sm:col-span-4">
+              <div className="sm:col-span-3">
                 <input
                   type="text"
                   defaultValue={apt.residentName}
@@ -651,7 +668,7 @@ export function SettingsTab() {
                   className="w-full rounded-md border border-zinc-200/80 bg-white px-2.5 py-1 text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-400"
                 />
               </div>
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-2">
                 <input
                   type="text"
                   defaultValue={apt.phone}
@@ -663,6 +680,22 @@ export function SettingsTab() {
                   }}
                   className="w-full rounded-md border border-zinc-200/80 bg-white px-2.5 py-1 font-mono text-xs text-zinc-600 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:placeholder:text-zinc-500 dark:focus:border-zinc-400"
                 />
+              </div>
+              <div className="sm:col-span-2">
+                <select
+                  aria-label={t.settings.billingCycle}
+                  value={apt.billingCycle ?? "monthly"}
+                  onChange={(e) =>
+                    updateApartment(apt.id, {
+                      billingCycle: normalizeBillingCycle(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-md border border-zinc-200/80 bg-white px-2 py-1 text-xs font-medium text-zinc-700 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:focus:border-zinc-400"
+                >
+                  <option value="monthly">{t.payments.cycleShort.monthly}</option>
+                  <option value="quarterly">{t.payments.cycleShort.quarterly}</option>
+                  <option value="annual">{t.payments.cycleShort.annual}</option>
+                </select>
               </div>
               <div className="sm:col-span-2">
                 <input

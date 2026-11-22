@@ -2,6 +2,7 @@ import { FREE_LOT_LIMIT } from "./config";
 import { translations } from "./i18n";
 import type {
   Apartment,
+  BillingCycle,
   Building,
   Expense,
   ExpenseCategory,
@@ -284,4 +285,40 @@ export function slugifyBuildingName(name: string, existingSlugs: string[]): stri
 export function getBuildingReferenceCode(buildingId: string): string {
   const cleaned = buildingId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   return `SYN-${cleaned.slice(-5).padStart(4, "0")}`;
+}
+
+/** Normalizes any string/CSV token into a supported resident billing cycle. */
+export function normalizeBillingCycle(value: unknown): BillingCycle {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    raw === "quarterly" ||
+    raw.startsWith("trimestr") ||
+    raw === "trim" ||
+    raw === "3" ||
+    raw === "3m" ||
+    raw.includes("ربع")
+  ) {
+    return "quarterly";
+  }
+  if (
+    raw === "annual" ||
+    raw === "yearly" ||
+    raw.startsWith("annuel") ||
+    raw === "12" ||
+    raw === "12m" ||
+    raw === "1y" ||
+    raw.includes("سنو")
+  ) {
+    return "annual";
+  }
+  return "monthly";
+}
+
+/** Returns how many months a resident billing cycle covers per installment. */
+export function getBillingCycleMonths(cycle?: BillingCycle): number {
+  if (cycle === "quarterly") return 3;
+  if (cycle === "annual") return 12;
+  return 1;
 }

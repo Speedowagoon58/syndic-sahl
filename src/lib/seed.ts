@@ -89,10 +89,16 @@ export function createSeedData(now: Date = new Date()): AppData {
     },
   ];
 
-  const atlasResidents = [
+  const atlasResidents: {
+    label: string;
+    name: string;
+    phone: string;
+    fee: number;
+    cycle?: Apartment["billingCycle"];
+  }[] = [
     { label: "Apt 1", name: "M. Karim Benali", phone: "0661234501", fee: 250 },
     { label: "Apt 2", name: "Mme Nadia El Fassi", phone: "0661234502", fee: 250 },
-    { label: "Apt 3", name: "M. Youssef Tazi", phone: "0662345603", fee: 250 },
+    { label: "Apt 3", name: "M. Youssef Tazi", phone: "0662345603", fee: 250, cycle: "quarterly" },
     { label: "Apt 4", name: "M. Rachid Berrada", phone: "0663456704", fee: 250 },
     { label: "Apt 5", name: "Mme Salma Chraïbi", phone: "0664567805", fee: 250 },
     { label: "Apt 6", name: "M. Omar Kettani", phone: "0665678906", fee: 250 },
@@ -101,7 +107,7 @@ export function createSeedData(now: Date = new Date()): AppData {
     { label: "Apt 9", name: "M. Tariq Bennani", phone: "0668901209", fee: 250 },
     { label: "Apt 10", name: "Mme Imane Sefrioui", phone: "0669012310", fee: 250 },
     { label: "Apt 11", name: "M. Hamza Ouazzani", phone: "0670123411", fee: 250 },
-    { label: "Magasin RDC", name: "Pharmacie Al Amal", phone: "0661987612", fee: 400 },
+    { label: "Magasin RDC", name: "Pharmacie Al Amal", phone: "0661987612", fee: 400, cycle: "annual" },
   ];
 
   const majorelleResidents = [
@@ -121,6 +127,7 @@ export function createSeedData(now: Date = new Date()): AppData {
       residentName: r.name,
       phone: r.phone,
       monthlyFee: r.fee,
+      billingCycle: r.cycle ?? "monthly",
       active: true,
       sortOrder: idx + 1,
     })),
@@ -131,6 +138,7 @@ export function createSeedData(now: Date = new Date()): AppData {
       residentName: r.name,
       phone: r.phone,
       monthlyFee: r.fee,
+      billingCycle: "monthly" as const,
       active: true,
       sortOrder: idx + 1,
     })),

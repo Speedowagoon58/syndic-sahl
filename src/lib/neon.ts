@@ -60,10 +60,13 @@ export async function ensureNeonSchema(): Promise<void> {
           resident_name text not null default '',
           phone text not null default '',
           monthly_fee numeric(12, 2) not null default 200,
+          billing_cycle text not null default 'monthly',
           active boolean not null default true,
           sort_order integer not null default 1
         )
       `;
+
+      await sql`alter table syndic_apartments add column if not exists billing_cycle text not null default 'monthly'`;
 
       await sql`
         create table if not exists syndic_payments (
@@ -150,10 +153,10 @@ export async function seedNeonDatabase(
   for (const a of seed.apartments) {
     await sql`
       insert into syndic_apartments (
-        id, building_id, unit_label, resident_name, phone, monthly_fee, active, sort_order
+        id, building_id, unit_label, resident_name, phone, monthly_fee, billing_cycle, active, sort_order
       ) values (
         ${a.id}, ${a.buildingId}, ${a.unitLabel}, ${a.residentName}, ${a.phone},
-        ${a.monthlyFee}, ${a.active}, ${a.sortOrder}
+        ${a.monthlyFee}, ${a.billingCycle ?? "monthly"}, ${a.active}, ${a.sortOrder}
       ) on conflict (id) do nothing
     `;
   }

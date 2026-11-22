@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NeonQueryFunction } from "@neondatabase/serverless";
+import { normalizeBillingCycle } from "@/lib/calculations";
 import { ensureNeonSchema, getSql } from "@/lib/neon";
 
 async function buildSafePortalResponse(
@@ -11,7 +12,7 @@ async function buildSafePortalResponse(
 
   const [aRows, pRows, eRows] = await Promise.all([
     sql`
-      select id, building_id, unit_label, resident_name, monthly_fee, active, sort_order
+      select id, building_id, unit_label, resident_name, monthly_fee, billing_cycle, active, sort_order
       from syndic_apartments
       where building_id = ${buildingId} and active = true
       order by sort_order asc
@@ -37,6 +38,7 @@ async function buildSafePortalResponse(
     residentName: showNames ? String(a.resident_name ?? "") : "",
     phone: "",
     monthlyFee: Number(a.monthly_fee),
+    billingCycle: normalizeBillingCycle(a.billing_cycle),
     active: Boolean(a.active),
     sortOrder: Number(a.sort_order ?? 1),
   }));

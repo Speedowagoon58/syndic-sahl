@@ -20,6 +20,8 @@ import {
   computeBuildingSummary,
   formatMAD,
   formatMonthLabel,
+  getBillingCycleMonths,
+  normalizeBillingCycle,
   shiftMonthKey,
 } from "@/lib/calculations";
 import {
@@ -158,7 +160,7 @@ export function PaymentsTab() {
     setPayAmount(apt.monthlyFee);
     setPayMethod("cash");
     setPayNote("");
-    setSelectedMonthsCount(1);
+    setSelectedMonthsCount(getBillingCycleMonths(apt.billingCycle));
     setClearAllArrears(false);
   };
 
@@ -184,12 +186,33 @@ export function PaymentsTab() {
         note: payNote,
       });
     } else {
+      const trimmedNote = payNote.trim();
+      const firstLabel = formatMonthLabel(monthsToSettle[0], locale);
+      const lastLabel = formatMonthLabel(
+        monthsToSettle[monthsToSettle.length - 1],
+        locale
+      );
+      const batchTotal = formatMAD(payAmount * monthsToSettle.length, locale);
+      const periodLabel =
+        monthsToSettle.length === 3
+          ? t.payments.cycleShort.quarterly
+          : monthsToSettle.length === 12
+          ? t.payments.cycleShort.annual
+          : monthsToSettle.length === 6
+          ? locale === "ar"
+            ? "نصف سنوي"
+            : "Semestriel"
+          : `${monthsToSettle.length} ${t.payments.monthsLabel}`;
+      const effectiveNote =
+        trimmedNote ||
+        `${periodLabel} (${monthsToSettle.length} ${t.payments.monthsLabel} : ${firstLabel} → ${lastLabel} — ${batchTotal})`;
+
       recordPaymentsBatch({
         apartmentId: modalInfo.apt.id,
         monthKeys: monthsToSettle,
         amountPerMonth: payAmount,
         method: payMethod,
-        note: payNote,
+        note: effectiveNote,
       });
     }
     setModalInfo(null);
@@ -594,9 +617,13 @@ export function PaymentsTab() {
                             : apt.monthlyFee,
                         rib: activeBuilding.rib,
                         portalUrl,
+                        billingCycle: apt.billingCycle,
+                        monthlyFee: apt.monthlyFee,
                       });
 
                   const waUrl = buildWhatsAppUrl(apt.phone, waMessage);
+                  const cycle = normalizeBillingCycle(apt.billingCycle);
+                  const cycleMonths = getBillingCycleMonths(cycle);
 
                   return (
                     <tr
@@ -619,7 +646,14 @@ export function PaymentsTab() {
                       </td>
 
                       <td className="px-3 py-3 text-end tabular-nums whitespace-nowrap font-medium text-zinc-700 dark:text-zinc-300">
-                        {formatMAD(apt.monthlyFee, locale)}
+                        <div>{formatMAD(apt.monthlyFee, locale)}</div>
+                        {cycle !== "monthly" && (
+                          <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                            <span>{t.payments.cycleShort[cycle]}</span>
+                            <span>•</span>
+                            <span>{formatMAD(apt.monthlyFee * cycleMonths, locale)}</span>
+                          </div>
+                        )}
                       </td>
 
                       <td className="px-3 py-3 whitespace-nowrap">
@@ -772,21 +806,26 @@ export function PaymentsTab() {
                   {t.payments.monthsCountLabel}
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {[1, 3, 6, 12].map((cnt) => (
+                  {[
+                    { cnt: 1, label: `1 ${t.payments.monthsLabel}` },
+                    { cnt: 3, label: t.payments.presetTrimestriel },
+                    { cnt: 6, label: t.payments.presetSemestriel },
+                    { cnt: 12, label: t.payments.presetAnnuel },
+                  ].map((preset) => (
                     <button
-                      key={cnt}
+                      key={preset.cnt}
                       type="button"
                       onClick={() => {
                         setClearAllArrears(false);
-                        setSelectedMonthsCount(cnt);
+                        setSelectedMonthsCount(preset.cnt);
                       }}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        !clearAllArrears && selectedMonthsCount === cnt
+                        !clearAllArrears && selectedMonthsCount === preset.cnt
                           ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950"
                           : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                       }`}
                     >
-                      {cnt} {t.payments.monthsLabel}
+                      {preset.label}
                     </button>
                   ))}
 

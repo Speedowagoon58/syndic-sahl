@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { normalizeBillingCycle } from "@/lib/calculations";
 import { ensureNeonSchema, getSql, seedNeonDatabase } from "@/lib/neon";
 import type {
   Apartment,
@@ -102,6 +103,7 @@ export async function GET() {
       residentName: String(a.resident_name ?? ""),
       phone: String(a.phone ?? ""),
       monthlyFee: Number(a.monthly_fee),
+      billingCycle: normalizeBillingCycle(a.billing_cycle),
       active: Boolean(a.active),
       sortOrder: Number(a.sort_order ?? 1),
     }));
@@ -227,10 +229,10 @@ export async function POST(request: Request) {
         if (!a?.id || !a?.unitLabel) continue;
         await sql`
           insert into syndic_apartments (
-            id, building_id, unit_label, resident_name, phone, monthly_fee, active, sort_order
+            id, building_id, unit_label, resident_name, phone, monthly_fee, billing_cycle, active, sort_order
           ) values (
             ${a.id}, ${a.buildingId}, ${a.unitLabel}, ${a.residentName}, ${a.phone},
-            ${a.monthlyFee}, ${a.active}, ${a.sortOrder}
+            ${a.monthlyFee}, ${normalizeBillingCycle(a.billingCycle)}, ${a.active}, ${a.sortOrder}
           ) on conflict (id) do nothing
         `;
       }
@@ -267,10 +269,10 @@ export async function POST(request: Request) {
         }
         await sql`
           insert into syndic_apartments (
-            id, building_id, unit_label, resident_name, phone, monthly_fee, active, sort_order
+            id, building_id, unit_label, resident_name, phone, monthly_fee, billing_cycle, active, sort_order
           ) values (
             ${a.id}, ${a.buildingId}, ${a.unitLabel}, ${a.residentName}, ${a.phone},
-            ${a.monthlyFee}, ${a.active}, ${a.sortOrder}
+            ${a.monthlyFee}, ${normalizeBillingCycle(a.billingCycle)}, ${a.active}, ${a.sortOrder}
           ) on conflict (id) do nothing
         `;
       }
@@ -285,6 +287,7 @@ export async function POST(request: Request) {
           resident_name = ${a.residentName},
           phone = ${a.phone},
           monthly_fee = ${a.monthlyFee},
+          billing_cycle = ${normalizeBillingCycle(a.billingCycle)},
           active = ${a.active}
         where id = ${a.id}
       `;

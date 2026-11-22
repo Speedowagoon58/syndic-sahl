@@ -1,6 +1,10 @@
 import { APP_NAME, PLANS } from "./config";
-import { formatMAD, formatMonthLabel } from "./calculations";
-import type { PlanDuration, WhatsAppLang } from "./types";
+import {
+  formatMAD,
+  formatMonthLabel,
+  getBillingCycleMonths,
+} from "./calculations";
+import type { BillingCycle, PlanDuration, WhatsAppLang } from "./types";
 
 /**
  * Normalizes Moroccan phone numbers to E.164 digits without '+' (e.g. "06 12-34-56-78" -> "212612345678").
@@ -79,9 +83,27 @@ export function buildReminderMessage(params: {
   totalOwed: number;
   rib: string;
   portalUrl: string;
+  billingCycle?: BillingCycle;
+  monthlyFee?: number;
 }): string {
-  const { lang, buildingName, unitLabel, residentName, unpaidMonths, totalOwed, rib, portalUrl } =
-    params;
+  const {
+    lang,
+    buildingName,
+    unitLabel,
+    residentName,
+    unpaidMonths,
+    totalOwed,
+    rib,
+    portalUrl,
+    billingCycle,
+    monthlyFee,
+  } = params;
+
+  const cycleMonths = getBillingCycleMonths(billingCycle);
+  const installmentAmount =
+    cycleMonths > 1 && monthlyFee && monthlyFee > 0
+      ? monthlyFee * cycleMonths
+      : 0;
 
   if (lang === "darija") {
     const monthsList = unpaidMonths.map((m) => formatMonthLabel(m, "fr")).join(", ");
@@ -91,6 +113,13 @@ export function buildReminderMessage(params: {
       `Chhoura li mazal ma tkhelssouch (${unpaidMonths.length}) : ${monthsList}`,
       `Total : *${formatMAD(totalOwed, "fr")}*`,
     ];
+    if (installmentAmount > 0) {
+      lines.push(
+        billingCycle === "quarterly"
+          ? `Formule : Trimestriel (${formatMAD(installmentAmount, "fr")} / 3 mois)`
+          : `Formule : Annuel (${formatMAD(installmentAmount, "fr")} / an)`
+      );
+    }
     if (rib.trim()) lines.push(`RIB dyal l-immeuble : ${rib.trim()}`);
     lines.push(`Chouf l-hissabat w l-fawatyr dyal l-immeuble hna : ${portalUrl}`);
     lines.push(`Chokran 3la t-ta3awon dyalkom !`);
@@ -105,6 +134,13 @@ export function buildReminderMessage(params: {
       `الأشهر المستحقة (${unpaidMonths.length}): ${monthsList}`,
       `المبلغ الإجمالي: *${formatMAD(totalOwed, "ar")}*`,
     ];
+    if (installmentAmount > 0) {
+      lines.push(
+        billingCycle === "quarterly"
+          ? `الصيغة المعتمدة: أداء ربع سنوي (${formatMAD(installmentAmount, "ar")} / 3 أشهر)`
+          : `الصيغة المعتمدة: أداء سنوي (${formatMAD(installmentAmount, "ar")} / سنة)`
+      );
+    }
     if (rib.trim()) lines.push(`رقم الحساب البنكي (RIB): ${rib.trim()}`);
     lines.push(`للاطلاع على حسابات وفواتير الإقامة بشفافية: ${portalUrl}`);
     lines.push(`شكراً لتفهمكم وتعاونكم.`);
@@ -118,6 +154,13 @@ export function buildReminderMessage(params: {
     `Mois en attente (${unpaidMonths.length}) : ${monthsList}`,
     `Total dû : *${formatMAD(totalOwed, "fr")}*`,
   ];
+  if (installmentAmount > 0) {
+    lines.push(
+      billingCycle === "quarterly"
+        ? `Formule : Trimestriel (${formatMAD(installmentAmount, "fr")} / 3 mois)`
+        : `Formule : Annuel (${formatMAD(installmentAmount, "fr")} / an)`
+    );
+  }
   if (rib.trim()) lines.push(`RIB de la copropriété : ${rib.trim()}`);
   lines.push(`Consulter les comptes et justificatifs de l'immeuble en ligne : ${portalUrl}`);
   lines.push(`Merci d'avance pour votre règlement.`);
