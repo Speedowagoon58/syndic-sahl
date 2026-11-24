@@ -35,6 +35,7 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
     toggleTheme,
     cloudConnected,
     isFounder,
+    canCreateBuilding,
     data,
     activeBuilding,
     activeBuildingRole,
@@ -155,14 +156,16 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={onOpenOnboarding}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 bg-transparent px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:border-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>{t.header.newBuilding}</span>
-          </button>
+          {(!cloudConnected || canCreateBuilding) && (
+            <button
+              type="button"
+              onClick={onOpenOnboarding}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 bg-transparent px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:border-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>{t.header.newBuilding}</span>
+            </button>
+          )}
         </div>
 
         {/* Navigation Links */}
@@ -255,7 +258,6 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 }`}
               />
               <span className="truncate font-medium text-zinc-700 dark:text-zinc-300">
-                {planAccess.mode === "free_tier" && t.banners.freeTierTitle}
                 {planAccess.mode === "trial" &&
                   `${planAccess.daysRemaining} ${t.banners.trialDaysLeft}`}
                 {planAccess.mode === "active" &&
@@ -320,14 +322,16 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                onClick={onOpenOnboarding}
-                className="rounded-md border border-zinc-200 p-1 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
-                title={t.header.newBuilding}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
+              {(!cloudConnected || canCreateBuilding) && (
+                <button
+                  type="button"
+                  onClick={onOpenOnboarding}
+                  className="rounded-md border border-zinc-200 p-1 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+                  title={t.header.newBuilding}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Desktop breadcrumb title + role badge */}
@@ -401,6 +405,25 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
             </button>
           </div>
         </header>
+
+        {/* Trial Countdown Bar */}
+        {planAccess.mode === "trial" && (
+          <div className="no-print border-b border-amber-200/80 bg-amber-50/70 px-4 py-1.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200 sm:px-8">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
+              <span>
+                <strong className="font-semibold">{t.banners.trialTitle}</strong> —{" "}
+                {planAccess.daysRemaining} {t.banners.trialDaysLeft}
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveTab("subscription")}
+                className="font-semibold underline hover:text-amber-700 dark:hover:text-amber-100"
+              >
+                {t.banners.upgradeCta} →
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Expired Read-Only Bar */}
         {planAccess.mode === "expired" && (

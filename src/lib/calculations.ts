@@ -220,20 +220,18 @@ export function computeAllTimeCategoryTotals(
 }
 
 export interface PlanAccessInfo {
-  mode: "free_tier" | "trial" | "active" | "expired";
+  mode: "trial" | "active" | "expired";
   isReadOnly: boolean;
   daysRemaining: number;
 }
 
 export function getPlanAccess(
   building: Building,
-  activeUnitCount: number,
+  _activeUnitCount: number = 0,
   nowMs: number = Date.now()
 ): PlanAccessInfo {
-  if (activeUnitCount <= FREE_LOT_LIMIT) {
-    return { mode: "free_tier", isReadOnly: false, daysRemaining: 0 };
-  }
-
+  void _activeUnitCount;
+  void FREE_LOT_LIMIT;
   const msPerDay = 1000 * 60 * 60 * 24;
 
   if (building.planStatus === "active" && building.planExpiresAt) {

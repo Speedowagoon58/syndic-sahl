@@ -19,6 +19,7 @@ import {
   escapeCsvCell,
 } from "../src/lib/export-csv";
 import {
+  buildFounderAccessInviteMessage,
   buildMemberInviteMessage,
   buildReminderMessage,
   buildWhatsAppUrl,
@@ -26,8 +27,11 @@ import {
 } from "../src/lib/whatsapp";
 import { translations } from "../src/lib/i18n";
 import {
+  canIdentityCreateBuilding,
   isFounderIdentity,
+  mapAccessGrantRow,
   maskEmailAddress,
+  normalizeAccessGrantStatus,
   normalizeMemberRole,
   normalizeMemberStatus,
 } from "../src/lib/auth-helpers";
@@ -177,9 +181,20 @@ describe("calculations", () => {
     assert.equal(summary.totalArrears, 250 + 900);
   });
 
-  it("evaluates plan access across free tier, trial, active, and expired", () => {
+  it("enforces strict trial, active, and expired plan access without free-tier bypass", () => {
     const now = Date.UTC(2026, 5, 1);
-    assert.equal(getPlanAccess(sampleBuilding, 8, now).mode, "free_tier");
+    const eightLotExpired = getPlanAccess(
+      {
+        ...sampleBuilding,
+        planStatus: "trial",
+        trialEndsAt: new Date(now - 86400 * 1000).toISOString(),
+      },
+      8,
+      now
+    );
+    assert.equal(eightLotExpired.mode, "expired");
+    assert.equal(eightLotExpired.isReadOnly, true);
+
     assert.equal(
       getPlanAccess(
         {
@@ -203,6 +218,19 @@ describe("calculations", () => {
       ).mode,
       "active"
     );
+    const expiredPaid = getPlanAccess(
+      {
+        ...sampleBuilding,
+        planStatus: "active",
+        planExpiresAt: new Date(now - 86400 * 1000).toISOString(),
+        trialEndsAt: new Date(now - 2 * 86400 * 1000).toISOString(),
+      },
+      8,
+      now
+    );
+    assert.equal(expiredPaid.mode, "expired");
+    assert.equal(expiredPaid.isReadOnly, true);
+
     const expired = getPlanAccess(
       {
         ...sampleBuilding,
@@ -381,5 +409,105 @@ describe("auth helpers", () => {
       if (prevAdmin === undefined) delete process.env.ADMIN_EMAIL;
       else process.env.ADMIN_EMAIL = prevAdmin;
     }
+  });
+
+  it("normalizes and maps platform access grants and creation permissions", () => {
+    assert.equal(normalizeAccessGrantStatus("approved"), "approved");
+    assert.equal(normalizeAccessGrantStatus("REVOKED"), "revoked");
+    assert.equal(normalizeAccessGrantStatus("unknown"), "pending");
+
+    const grant = mapAccessGrantRow({
+      id: "grant-1",
+      email: "Syndic@Example.com",
+      full_name: "Karim Bennani",
+      building_name: "Résidence Atlas",
+      phone: "0661223344",
+      status: "approved",
+      trial_days: 30,
+      max_buildings: 2,
+      token: "tok-123",
+      note: "Pilote",
+      granted_by: "founder@example.com",
+      claimed_by_user_id: null,
+      claimed_at: null,
+      created_at: "2026-11-01T10:00:00.000Z",
+      updated_at: "2026-11-01T10:00:00.000Z",
+    });
+
+    assert.equal(grant.email, "syndic@example.com");
+    assert.equal(grant.status, "approved");
+    assert.equal(grant.trialDays, 30);
+    assert.equal(grant.maxBuildings, 2);
+
+    assert.equal(
+      canIdentityCreateBuilding({
+        isFounder: false,
+        grant: null,
+        ownedBuildingsCount: 0,
+      }),
+      false
+    );
+    assert.equal(
+      canIdentityCreateBuilding({
+        isFounder: false,
+        grant,
+        ownedBuildingsCount: 1,
+      }),
+      true
+    );
+    assert.equal(
+      canIdentityCreateBuilding({
+        isFounder: false,
+        grant,
+        ownedBuildingsCount: 2,
+      }),
+      false
+    );
+    assert.equal(
+      canIdentityCreateBuilding({
+        isFounder: false,
+        grant: { ...grant, status: "revoked" },
+        ownedBuildingsCount: 0,
+      }),
+      false
+    );
+    assert.equal(
+      canIdentityCreateBuilding({
+        isFounder: true,
+        grant: null,
+        ownedBuildingsCount: 10,
+      }),
+      true
+    );
+  });
+
+  it("builds founder access invite messages in FR, AR, and Darija", () => {
+    const fr = buildFounderAccessInviteMessage({
+      lang: "fr",
+      fullName: "Karim",
+      buildingName: "Résidence Atlas",
+      trialDays: 30,
+      activateUrl: "https://syndic-sahl-one.vercel.app/activate/tok-123",
+    });
+    assert.ok(fr.includes("30 jours"));
+    assert.ok(fr.includes("/activate/tok-123"));
+
+    const ar = buildFounderAccessInviteMessage({
+      lang: "ar",
+      fullName: "كريم",
+      buildingName: "إقامة أطلس",
+      trialDays: 30,
+      activateUrl: "https://syndic-sahl-one.vercel.app/activate/tok-123",
+    });
+    assert.ok(ar.includes("30 يوماً"));
+    assert.ok(ar.includes("/activate/tok-123"));
+
+    const darija = buildFounderAccessInviteMessage({
+      lang: "darija",
+      trialDays: 30,
+      activateUrl: "https://syndic-sahl-one.vercel.app/activate/tok-123",
+    });
+    assert.ok(darija.includes("30 youm"));
+    assert.ok(darija.includes("/activate/tok-123"));
   });
 });

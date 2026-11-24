@@ -177,6 +177,28 @@ export async function ensureNeonSchema(): Promise<void> {
         )
       `;
 
+      await sql`
+        create table if not exists syndic_access_grants (
+          id text primary key,
+          email text not null,
+          full_name text not null default '',
+          building_name text not null default '',
+          city text not null default '',
+          units_estimate integer not null default 12,
+          phone text not null default '',
+          status text not null default 'pending',
+          trial_days integer not null default 30,
+          max_buildings integer not null default 1,
+          access_token text not null unique,
+          note text not null default '',
+          granted_by text,
+          clerk_user_id text,
+          created_at timestamptz not null default now(),
+          approved_at timestamptz,
+          claimed_at timestamptz
+        )
+      `;
+
       await sql`create index if not exists idx_syndic_apt_building on syndic_apartments(building_id, sort_order)`;
       await sql`create index if not exists idx_syndic_pay_building on syndic_payments(building_id, month_key)`;
       await sql`create index if not exists idx_syndic_exp_building on syndic_expenses(building_id, expense_date desc)`;
@@ -186,6 +208,8 @@ export async function ensureNeonSchema(): Promise<void> {
       await sql`create index if not exists idx_syndic_audit_building on syndic_audit_logs(building_id, created_at desc)`;
       await sql`create index if not exists idx_syndic_ann_building on syndic_announcements(building_id, pinned desc, created_at desc)`;
       await sql`create index if not exists idx_syndic_tkt_building on syndic_tickets(building_id, created_at desc)`;
+      await sql`create unique index if not exists idx_syndic_grants_email_lower on syndic_access_grants(lower(email))`;
+      await sql`create index if not exists idx_syndic_grants_status on syndic_access_grants(status, created_at desc)`;
 
       // Auto-seed realistic Moroccan demo data if database is brand new
       const countRows = await sql`select count(*)::int as cnt from syndic_buildings`;

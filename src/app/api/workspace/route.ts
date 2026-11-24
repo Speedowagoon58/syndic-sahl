@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import {
   activateMatchingInvites,
+  assertBuildingWritable,
+  canIdentityCreateBuilding,
   claimUnownedLegacyBuildingsIfNeeded,
   getAuthenticatedClerkIdentity,
+  getIdentityAccessGrant,
   getUserBuildingMembership,
   isClerkServerConfigured,
   isFounderIdentity,
@@ -11,6 +14,7 @@ import {
   normalizeMemberRole,
   type AuthenticatedClerkIdentity,
 } from "@/lib/auth-server";
+import { TRIAL_DAYS } from "@/lib/config";
 import { normalizeBillingCycle } from "@/lib/calculations";
 import { ensureNeonSchema, getSql, seedNeonDatabase } from "@/lib/neon";
 import type {
@@ -117,6 +121,18 @@ function forbidden(message = "Insufficient role permissions for this building") 
   return NextResponse.json(
     { mode: "error", ok: false, error: "forbidden", message },
     { status: 403 }
+  );
+}
+
+function subscriptionExpiredResponse() {
+  return NextResponse.json(
+    {
+      mode: "error",
+      ok: false,
+      error: "subscription_expired",
+      message: "Essai expiré — abonnement requis pour modifier cet immeuble",
+    },
+    { status: 402 }
   );
 }
 
@@ -279,11 +295,23 @@ export async function GET() {
       }
 
       const isFounder = isFounderIdentity(identity);
+      const accessGrant = await getIdentityAccessGrant(sql, identity);
+      const safeGrant = accessGrant ? { ...accessGrant, accessToken: "" } : null;
+      const ownedBuildingsCount = ownedRows.length;
+      const canCreateBuilding = canIdentityCreateBuilding({
+        isFounder,
+        grant: accessGrant,
+        ownedBuildingsCount,
+      });
+
       const authorizedIds = Object.keys(myRoles);
       if (authorizedIds.length === 0) {
         return NextResponse.json({
           mode: "neon",
           isFounder,
+          canCreateBuilding,
+          ownedBuildingsCount,
+          accessGrant: safeGrant,
           user: {
             id: identity.userId,
             email: identity.primaryEmail,
@@ -408,6 +436,9 @@ export async function GET() {
       return NextResponse.json({
         mode: "neon",
         isFounder,
+        canCreateBuilding,
+        ownedBuildingsCount,
+        accessGrant: safeGrant,
         user: {
           id: identity.userId,
           email: identity.primaryEmail,
@@ -489,6 +520,9 @@ export async function GET() {
     return NextResponse.json({
       mode: "neon",
       isFounder: true,
+      canCreateBuilding: true,
+      ownedBuildingsCount: buildings.length,
+      accessGrant: null,
       myRoles: Object.fromEntries(buildings.map((b) => [b.id, "syndic" as const])),
       buildings,
       apartments,
@@ -572,6 +606,11 @@ export async function POST(request: Request) {
     return match.role;
   };
 
+  const checkWritable = async (buildingId: string): Promise<boolean> => {
+    const res = await assertBuildingWritable(sql, buildingId);
+    return res.ok;
+  };
+
   try {
     await ensureNeonSchema();
 
@@ -580,6 +619,34 @@ export async function POST(request: Request) {
       if (!b || !b.id?.trim() || !b.name?.trim() || !b.shareSlug?.trim()) {
         return badRequest("invalid_building", "Building id, name and slug are required");
       }
+
+      const isFounder = clerkActive && identity ? isFounderIdentity(identity) : true;
+      const accessGrant =
+        clerkActive && identity ? await getIdentityAccessGrant(sql, identity) : null;
+      if (clerkActive && identity) {
+        const ownedCountRows = await sql`
+          select count(*)::int as cnt from syndic_buildings where owner_id = ${identity.userId}
+        `;
+        const ownedBuildingsCount = Number(ownedCountRows[0]?.cnt ?? 0);
+        if (
+          !canIdentityCreateBuilding({
+            isFounder,
+            grant: accessGrant,
+            ownedBuildingsCount,
+          })
+        ) {
+          return NextResponse.json(
+            {
+              mode: "error",
+              ok: false,
+              error: "access_required",
+              message: "Accès sur invitation fondateur requis pour créer un immeuble.",
+            },
+            { status: 403 }
+          );
+        }
+      }
+
       const userId = identity?.userId ?? null;
       const units = Array.isArray(payload.apartments)
         ? (payload.apartments as Apartment[])
@@ -593,6 +660,16 @@ export async function POST(request: Request) {
           ? `${baseSlug}-${crypto.randomUUID().slice(0, 4)}`
           : baseSlug;
 
+      const trialDays = Math.max(
+        1,
+        Math.min(365, accessGrant?.trialDays ?? TRIAL_DAYS)
+      );
+      const serverPlanStatus = "trial";
+      const serverTrialEndsAt = new Date(
+        Date.now() + trialDays * 86_400_000
+      ).toISOString();
+      const serverPlanExpiresAt = null;
+
       await sql`
         insert into syndic_buildings (
           id, owner_id, name, city, default_monthly_fee, opening_balance, start_month,
@@ -600,10 +677,19 @@ export async function POST(request: Request) {
           trial_ends_at, plan_expires_at, created_at
         ) values (
           ${b.id}, ${userId}, ${b.name}, ${b.city}, ${b.defaultMonthlyFee}, ${b.openingBalance}, ${b.startMonth},
-          ${b.rib}, ${finalSlug}, ${b.sharePin}, ${b.showNamesPublicly}, ${b.planStatus},
-          ${b.trialEndsAt}, ${b.planExpiresAt}, ${b.createdAt}
+          ${b.rib}, ${finalSlug}, ${b.sharePin}, ${b.showNamesPublicly}, ${serverPlanStatus},
+          ${serverTrialEndsAt}, ${serverPlanExpiresAt}, ${b.createdAt}
         ) on conflict (id) do nothing
       `;
+
+      if (identity && accessGrant) {
+        await sql`
+          update syndic_access_grants
+          set clerk_user_id = ${identity.userId},
+              claimed_at = coalesce(claimed_at, now())
+          where id = ${accessGrant.id}
+        `;
+      }
 
       if (identity) {
         const ownerEmail = identity.primaryEmail || `${identity.userId}@clerk.local`;
@@ -639,7 +725,13 @@ export async function POST(request: Request) {
         action: "create_building",
         summary: `${b.name} (${units.length} lots)`,
       });
-      return NextResponse.json({ mode: "neon", ok: true, shareSlug: finalSlug });
+      return NextResponse.json({
+        mode: "neon",
+        ok: true,
+        shareSlug: finalSlug,
+        planStatus: serverPlanStatus,
+        trialEndsAt: serverTrialEndsAt,
+      });
     } else if (action === "update_building") {
       const b = payload.building as Building | undefined;
       if (
@@ -654,6 +746,9 @@ export async function POST(request: Request) {
       const callerRole = await checkRole(b.id, ["syndic", "assistant"]);
       if (!callerRole) {
         return forbidden();
+      }
+      if (!(await checkWritable(b.id))) {
+        return subscriptionExpiredResponse();
       }
       await sql`
         update syndic_buildings set
@@ -720,6 +815,9 @@ export async function POST(request: Request) {
       if (!callerRole) {
         return forbidden();
       }
+      if (!(await checkWritable(targetBuildingId))) {
+        return subscriptionExpiredResponse();
+      }
       for (const a of units) {
         if (!a?.id || !a?.buildingId || a.buildingId !== targetBuildingId || !a?.unitLabel) {
           return badRequest("invalid_apartment", "Apartment id, consistent buildingId and unitLabel are required");
@@ -761,6 +859,9 @@ export async function POST(request: Request) {
       if (!callerRole) {
         return forbidden();
       }
+      if (!(await checkWritable(bId))) {
+        return subscriptionExpiredResponse();
+      }
       await sql`
         update syndic_apartments set
           unit_label = ${a.unitLabel},
@@ -793,6 +894,9 @@ export async function POST(request: Request) {
       const callerRole = await checkRole(p.buildingId, ["syndic", "assistant"]);
       if (!callerRole) {
         return forbidden();
+      }
+      if (!(await checkWritable(p.buildingId))) {
+        return subscriptionExpiredResponse();
       }
       const aptCheck = await sql`
         select 1 from syndic_apartments
@@ -838,6 +942,9 @@ export async function POST(request: Request) {
       const callerRole = await checkRole(targetBuildingId, ["syndic", "assistant"]);
       if (!callerRole) {
         return forbidden();
+      }
+      if (!(await checkWritable(targetBuildingId))) {
+        return subscriptionExpiredResponse();
       }
       for (const p of list) {
         if (
@@ -899,6 +1006,9 @@ export async function POST(request: Request) {
         if (!callerRole) {
           return forbidden();
         }
+        if (!(await checkWritable(bId))) {
+          return subscriptionExpiredResponse();
+        }
         await sql`delete from syndic_payments where id = ${paymentId}`;
         await writeAuditLog(sql, {
           buildingId: bId,
@@ -923,6 +1033,9 @@ export async function POST(request: Request) {
       const callerRole = await checkRole(e.buildingId, ["syndic", "assistant"]);
       if (!callerRole) {
         return forbidden();
+      }
+      if (!(await checkWritable(e.buildingId))) {
+        return subscriptionExpiredResponse();
       }
       await sql`
         insert into syndic_expenses (
@@ -952,6 +1065,9 @@ export async function POST(request: Request) {
         const callerRole = await checkRole(bId, ["syndic", "assistant"]);
         if (!callerRole) {
           return forbidden();
+        }
+        if (!(await checkWritable(bId))) {
+          return subscriptionExpiredResponse();
         }
         await sql`delete from syndic_expenses where id = ${expenseId}`;
         await writeAuditLog(sql, {
@@ -1026,6 +1142,9 @@ export async function POST(request: Request) {
             ? "Only the principal syndic can invite building admins"
             : "Insufficient permissions to invite members"
         );
+      }
+      if (!(await checkWritable(buildingId))) {
+        return subscriptionExpiredResponse();
       }
 
       if (apartmentId) {
@@ -1123,6 +1242,9 @@ export async function POST(request: Request) {
       if (!callerRole) {
         return forbidden("Insufficient permissions to update this member");
       }
+      if (!(await checkWritable(targetBuildingId))) {
+        return subscriptionExpiredResponse();
+      }
 
       if (hasApt && apartmentId) {
         const aptCheck = await sql`
@@ -1185,6 +1307,9 @@ export async function POST(request: Request) {
       if (!callerRole) {
         return forbidden();
       }
+      if (!(await checkWritable(String(target.building_id)))) {
+        return subscriptionExpiredResponse();
+      }
       await sql`
         update syndic_memberships set status = 'revoked' where id = ${membershipId}
       `;
@@ -1203,6 +1328,9 @@ export async function POST(request: Request) {
       }
       if (!(await checkRole(buildingId, ["syndic"]))) {
         return forbidden("Only the principal syndic can transfer building ownership");
+      }
+      if (!(await checkWritable(buildingId))) {
+        return subscriptionExpiredResponse();
       }
 
       const targetRows = await sql`
@@ -1292,6 +1420,9 @@ export async function POST(request: Request) {
       if (!callerRole) {
         return forbidden();
       }
+      if (!(await checkWritable(buildingId))) {
+        return subscriptionExpiredResponse();
+      }
 
       const id = String(payload.id ?? "").trim() || `ann-${crypto.randomUUID().slice(0, 8)}`;
       const authorName = identity?.fullName || "Syndic";
@@ -1339,6 +1470,9 @@ export async function POST(request: Request) {
       if (!(await checkRole(bId, ["syndic", "assistant"]))) {
         return forbidden();
       }
+      if (!(await checkWritable(bId))) {
+        return subscriptionExpiredResponse();
+      }
       await sql`
         update syndic_announcements set pinned = ${!Boolean(rows[0].pinned)} where id = ${announcementId}
       `;
@@ -1355,6 +1489,9 @@ export async function POST(request: Request) {
         const callerRole = await checkRole(bId, ["syndic", "assistant"]);
         if (!callerRole) {
           return forbidden();
+        }
+        if (!(await checkWritable(bId))) {
+          return subscriptionExpiredResponse();
         }
         await sql`delete from syndic_announcements where id = ${announcementId}`;
         await writeAuditLog(sql, {
@@ -1386,6 +1523,9 @@ export async function POST(request: Request) {
       const callerRole = await checkRole(buildingId, ["syndic", "assistant", "tenant"]);
       if (!callerRole) {
         return forbidden();
+      }
+      if (!(await checkWritable(buildingId))) {
+        return subscriptionExpiredResponse();
       }
 
       const id = String(payload.id ?? "").trim() || `tkt-${crypto.randomUUID().slice(0, 8)}`;
@@ -1439,6 +1579,9 @@ export async function POST(request: Request) {
       if (!callerRole) {
         return forbidden();
       }
+      if (!(await checkWritable(bId))) {
+        return subscriptionExpiredResponse();
+      }
 
       const updated = await sql`
         update syndic_tickets
@@ -1475,6 +1618,9 @@ export async function POST(request: Request) {
         const callerRole = await checkRole(bId, ["syndic", "assistant"]);
         if (!callerRole) {
           return forbidden();
+        }
+        if (!(await checkWritable(bId))) {
+          return subscriptionExpiredResponse();
         }
         await sql`delete from syndic_tickets where id = ${ticketId}`;
         await writeAuditLog(sql, {

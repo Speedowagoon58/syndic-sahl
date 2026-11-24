@@ -8,7 +8,7 @@ export const APP_NAME_AR = "سانديك ساهل";
 export const APP_TAGLINE_FR = "Gestion transparente de copropriété au Maroc";
 export const APP_TAGLINE_AR = "تسيير شفاف ومبسط لاتحاد الملاك بالمغرب";
 
-export const FREE_LOT_LIMIT = 8;
+export const FREE_LOT_LIMIT = 0;
 export const TRIAL_DAYS = 30;
 
 export const PLANS = {

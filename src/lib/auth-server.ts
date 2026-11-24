@@ -1,23 +1,31 @@
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import {
+  canIdentityCreateBuilding,
   getFounderEmails,
   isClerkServerConfigured,
   isFounderIdentity,
+  mapAccessGrantRow,
   mapMembershipRow,
   maskEmailAddress,
+  normalizeAccessGrantStatus,
   normalizeMemberRole,
   normalizeMemberStatus,
   type AuthenticatedClerkIdentity,
   type UserMembershipMatch,
 } from "./auth-helpers";
+import { getPlanAccess } from "./calculations";
+import type { Building, PlatformAccessGrant } from "./types";
 
 export {
+  canIdentityCreateBuilding,
   getFounderEmails,
   isClerkServerConfigured,
   isFounderIdentity,
+  mapAccessGrantRow,
   mapMembershipRow,
   maskEmailAddress,
+  normalizeAccessGrantStatus,
   normalizeMemberRole,
   normalizeMemberStatus,
 };
@@ -62,12 +70,13 @@ export async function getAuthenticatedClerkIdentity(): Promise<AuthenticatedCler
 
 /**
  * Bootstraps legacy unowned buildings (created before invite-only RBAC existed)
- * by assigning them to the first authenticated syndic so no existing data is orphaned.
+ * by assigning them strictly to the founder account so visitors never inherit legacy data.
  */
 export async function claimUnownedLegacyBuildingsIfNeeded(
   sql: NeonQueryFunction<false, false>,
   identity: AuthenticatedClerkIdentity
 ): Promise<void> {
+  if (!isFounderIdentity(identity)) return;
   const unownedRows = await sql`
     select b.id
     from syndic_buildings b
@@ -164,4 +173,79 @@ export async function getUserBuildingMembership(
   }
 
   return null;
+}
+
+/**
+ * Looks up a platform-level trial/access grant matching the authenticated user's Clerk ID or emails.
+ */
+export async function getIdentityAccessGrant(
+  sql: NeonQueryFunction<false, false>,
+  identity: AuthenticatedClerkIdentity
+): Promise<PlatformAccessGrant | null> {
+  const rows =
+    identity.emails.length > 0
+      ? await sql`
+          select *
+          from syndic_access_grants
+          where clerk_user_id = ${identity.userId}
+             or lower(email) = any(${identity.emails})
+          order by case status when 'approved' then 1 when 'pending' then 2 else 3 end asc,
+                   created_at desc
+          limit 1
+        `
+      : await sql`
+          select *
+          from syndic_access_grants
+          where clerk_user_id = ${identity.userId}
+          order by case status when 'approved' then 1 when 'pending' then 2 else 3 end asc,
+                   created_at desc
+          limit 1
+        `;
+
+  if (!rows[0]) return null;
+  return mapAccessGrantRow(rows[0] as Record<string, unknown>, true);
+}
+
+/**
+ * Enforces server-side 30-day trial / active subscription lock for mutating building operations.
+ */
+export async function assertBuildingWritable(
+  sql: NeonQueryFunction<false, false>,
+  buildingId: string
+): Promise<{ ok: true } | { ok: false; mode: "expired" }> {
+  const rows = await sql`
+    select id, plan_status, trial_ends_at, plan_expires_at
+    from syndic_buildings
+    where id = ${buildingId}
+    limit 1
+  `;
+  const row = rows[0];
+  if (!row) {
+    return { ok: true };
+  }
+
+  const pseudoBuilding = {
+    id: String(row.id),
+    name: "",
+    city: "",
+    defaultMonthlyFee: 0,
+    openingBalance: 0,
+    startMonth: "2026-01",
+    rib: "",
+    shareSlug: "",
+    sharePin: "",
+    showNamesPublicly: false,
+    planStatus: String(row.plan_status ?? "trial") as Building["planStatus"],
+    trialEndsAt: new Date(String(row.trial_ends_at)).toISOString(),
+    planExpiresAt: row.plan_expires_at
+      ? new Date(String(row.plan_expires_at)).toISOString()
+      : null,
+    createdAt: new Date().toISOString(),
+  };
+
+  const access = getPlanAccess(pseudoBuilding, 0, Date.now());
+  if (access.isReadOnly) {
+    return { ok: false, mode: "expired" };
+  }
+  return { ok: true };
 }

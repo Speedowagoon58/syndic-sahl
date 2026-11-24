@@ -37,6 +37,7 @@ export function SubscriptionTab() {
     data,
     activeBuilding,
     buildingApartments,
+    planAccess,
     submitSubscriptionRequest,
     showToast,
   } = useApp();
@@ -109,23 +110,33 @@ export function SubscriptionTab() {
 
       {/* Pricing Cards — Restrained Linear / Stripe aesthetic */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {/* Free Tier */}
+        {/* 30-Day Trial Card */}
         <div className="flex flex-col justify-between rounded-xl border border-zinc-200/90 bg-white p-5 shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
           <div>
             <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-              {t.subscription.freeTierName}
+              {t.subscription.trialTierName}
             </span>
             <p className="mt-2 tabular-nums text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
-              {t.subscription.freeTierPrice}
+              {t.subscription.trialTierPrice}
             </p>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {t.subscription.freeTierLimit}
+              {t.subscription.trialTierLimit}
             </p>
           </div>
-          <div className="mt-6 border-t border-zinc-100 pt-3 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-            {activeUnits <= 8
-              ? t.subscription.activeForBuilding
-              : `${activeUnits} ${t.header.lotActivePlural}`}
+          <div className="mt-6 border-t border-zinc-100 pt-3 text-xs dark:border-zinc-800">
+            {planAccess.mode === "active" ? (
+              <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                {t.banners.activePlanTitle}
+              </span>
+            ) : planAccess.mode === "trial" ? (
+              <span className="font-medium text-amber-700 dark:text-amber-400">
+                {planAccess.daysRemaining} {t.banners.trialDaysLeft}
+              </span>
+            ) : (
+              <span className="font-medium text-red-600 dark:text-red-400">
+                {t.banners.expiredTitle}
+              </span>
+            )}
           </div>
         </div>
 

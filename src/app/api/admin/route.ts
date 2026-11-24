@@ -3,6 +3,7 @@ import {
   getAuthenticatedClerkIdentity,
   isClerkServerConfigured,
   isFounderIdentity,
+  mapAccessGrantRow,
 } from "@/lib/auth-server";
 import { ensureNeonSchema, getSql } from "@/lib/neon";
 import type { Building, SubscriptionRequest } from "@/lib/types";
@@ -27,7 +28,7 @@ export async function GET() {
   try {
     await ensureNeonSchema();
 
-    const [bRows, countRows, sRows] = await Promise.all([
+    const [bRows, countRows, sRows, gRows] = await Promise.all([
       sql`select * from syndic_buildings order by created_at asc`,
       sql`
         select building_id, count(*)::int as active_count
@@ -36,6 +37,11 @@ export async function GET() {
         group by building_id
       `,
       sql`select * from syndic_subscription_requests order by created_at desc`,
+      sql`
+        select * from syndic_access_grants
+        order by case status when 'pending' then 1 when 'approved' then 2 else 3 end asc,
+                 created_at desc
+      `,
     ]);
 
     const unitCounts: Record<string, number> = {};
@@ -76,11 +82,16 @@ export async function GET() {
       createdAt: new Date(String(s.created_at)).toISOString(),
     }));
 
+    const accessGrants = gRows.map((g) =>
+      mapAccessGrantRow(g as Record<string, unknown>, true)
+    );
+
     return NextResponse.json({
       mode: "neon",
       buildings,
       unitCounts,
       subscriptionRequests,
+      accessGrants,
     });
   } catch (error) {
     return NextResponse.json(

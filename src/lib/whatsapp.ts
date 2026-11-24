@@ -348,3 +348,69 @@ export function buildMemberInviteMessage(params: {
     inviteUrl,
   ].join("\n");
 }
+
+export function buildFounderAccessInviteMessage(params: {
+  lang: WhatsAppLang;
+  fullName?: string;
+  buildingName?: string;
+  trialDays: number;
+  activateUrl: string;
+}): string {
+  const { lang, fullName, buildingName, trialDays, activateUrl } = params;
+  const greetingName = (fullName ?? "").trim() || "Syndic";
+  const cleanBuilding = (buildingName ?? "").trim();
+
+  if (lang === "ar") {
+    return [
+      `السلام عليكم ${greetingName}،`,
+      `تم تفعيل ولوجكم الخاص لتجربة منصة *${APP_NAME}* مجاناً لمدة *${trialDays} يوماً*${cleanBuilding ? ` لإقامة *${cleanBuilding}*` : ""}.`,
+      `اضغطوا على رابط التفعيل وسجلوا الدخول بحساب Google أو البريد الإلكتروني المسجل:`,
+      activateUrl,
+    ].join("\n");
+  }
+
+  if (lang === "darija") {
+    return [
+      `Salam ${greetingName},`,
+      `Ftehna lik accès privé bach t-jerreb *${APP_NAME}* fabour l-moddat *${trialDays} youm*${cleanBuilding ? ` l-*${cleanBuilding}*` : ""}.`,
+      `Dkhoul mn had l-lien w t-connecta b Google wla b l-e-mail dyalek:`,
+      activateUrl,
+    ].join("\n");
+  }
+
+  return [
+    `Bonjour ${greetingName},`,
+    `Votre accès privé à *${APP_NAME}* est activé pour un essai gratuit de *${trialDays} jours*${cleanBuilding ? ` (${cleanBuilding})` : ""}.`,
+    `Ouvrez ce lien et connectez-vous avec Google ou votre adresse e-mail pour créer votre immeuble :`,
+    activateUrl,
+  ].join("\n");
+}
+
+export function buildAccessRequestMessage(params: {
+  lang: WhatsAppLang;
+  fullName: string;
+  email: string;
+  buildingName: string;
+  city: string;
+  unitsEstimate: number;
+}): string {
+  const { lang, fullName, email, buildingName, city, unitsEstimate } = params;
+
+  if (lang === "ar") {
+    return [
+      `السلام عليكم،`,
+      `أرغب في تفعيل حساب تجربة مجانية (30 يوماً) على *${APP_NAME}* :`,
+      `• الاسم: ${fullName || "—"}`,
+      `• البريد الإلكتروني: ${email}`,
+      `• الإقامة: ${buildingName}${city ? ` (${city})` : ""} — حوالي ${unitsEstimate} شقة`,
+    ].join("\n");
+  }
+
+  return [
+    `Bonjour l'équipe *${APP_NAME}*,`,
+    `Je viens de demander un accès d'essai gratuit (30 jours) pour notre copropriété :`,
+    `• Nom : ${fullName || "—"}`,
+    `• E-mail : ${email}`,
+    `• Immeuble : *${buildingName}*${city ? ` (${city})` : ""} (~${unitsEstimate} lots)`,
+  ].join("\n");
+}

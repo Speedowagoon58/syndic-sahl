@@ -121,8 +121,8 @@ export default function LandingPage() {
             >
               <span>
                 {isAr
-                  ? "تجربة التطبيق مجاناً (30 يوماً)"
-                  : "Démarrer gratuitement (Essai 30 jours)"}
+                  ? "طلب تجربة مجانية (30 يوماً بدعوة)"
+                  : "Demander un accès essai (30 jours)"}
               </span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
@@ -284,13 +284,15 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-zinc-200/90 bg-white p-6 dark:border-zinc-800 dark:bg-[#111113]">
             <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-              {isAr ? "عمارات صغيرة" : "Petits immeubles"}
+              {isAr ? "تجربة بدعوة مسبقة" : "Essai sur invitation"}
             </span>
             <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
               0 MAD
             </p>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {isAr ? "حتى 8 شقق مجاناً مدى الحياة" : "Jusqu'à 8 lots gratuit à vie"}
+              {isAr
+                ? "30 يوماً مجاناً بدعوة من الإدارة، ثم اختيار الباقة"
+                : "30 jours d'essai gratuit sur invitation, puis abonnement"}
             </p>
           </div>
 

@@ -44,6 +44,7 @@ import type {
   Payment,
   PaymentMethod,
   PlanDuration,
+  PlatformAccessGrant,
   SubscriptionChannel,
   SubscriptionRequest,
   ThemeMode,
@@ -74,7 +75,7 @@ const emptySubscribe = () => () => {};
 function syncWorkspaceAction(
   action: string,
   payload: Record<string, unknown> = {},
-  onError?: () => void
+  onError?: (status?: number) => void
 ): void {
   if (typeof window === "undefined") return;
   fetch("/api/workspace", {
@@ -83,7 +84,7 @@ function syncWorkspaceAction(
     body: JSON.stringify({ action, payload }),
   })
     .then((res) => {
-      if (!res.ok) onError?.();
+      if (!res.ok) onError?.(res.status);
     })
     .catch(() => {
       onError?.();
@@ -111,6 +112,9 @@ interface AppContextValue {
   authRequired: boolean;
   cloudConnected: boolean;
   isFounder: boolean;
+  canCreateBuilding: boolean;
+  ownedBuildingsCount: number;
+  accessGrant: PlatformAccessGrant | null;
   data: AppData;
   t: TranslationDict;
   locale: Locale;
@@ -139,6 +143,13 @@ interface AppContextValue {
   setActiveBuildingId: (buildingId: string) => void;
   showToast: (message: string) => void;
   refreshWorkspace: () => Promise<void>;
+  requestPlatformAccess: (input: {
+    fullName: string;
+    buildingName: string;
+    city: string;
+    unitsEstimate: number;
+    phone: string;
+  }) => Promise<{ ok: boolean; status?: string; error?: string }>;
   createBuilding: (input: CreateBuildingInput) => Building;
   deleteBuilding: (buildingId: string) => boolean;
   updateBuildingSettings: (
@@ -272,6 +283,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadAppData());
   const [cloudConnected, setCloudConnected] = useState(false);
   const [isFounder, setIsFounder] = useState(false);
+  const [canCreateBuilding, setCanCreateBuilding] = useState(true);
+  const [ownedBuildingsCount, setOwnedBuildingsCount] = useState(0);
+  const [accessGrant, setAccessGrant] = useState<PlatformAccessGrant | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>("payments");
@@ -296,6 +310,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAuthRequired(true);
       setCloudConnected(false);
       setIsFounder(false);
+      setCanCreateBuilding(false);
+      setOwnedBuildingsCount(0);
+      setAccessGrant(null);
       setData((prev) => ({
         ...prev,
         activeBuildingId: "",
@@ -318,6 +335,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAuthRequired(false);
     setCloudConnected(true);
     setIsFounder(Boolean(remote.isFounder));
+    setCanCreateBuilding(remote.canCreateBuilding !== false);
+    setOwnedBuildingsCount(Number(remote.ownedBuildingsCount ?? 0));
+    setAccessGrant((remote.accessGrant as PlatformAccessGrant | null) ?? null);
     setData((prev) => {
       const remoteBuildings = remote.buildings as Building[];
       const validActive = remoteBuildings.some(
@@ -368,7 +388,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pathname.startsWith("/sign-in") ||
       pathname.startsWith("/sign-up") ||
       pathname.startsWith("/login") ||
-      pathname.startsWith("/invite/");
+      pathname.startsWith("/invite/") ||
+      pathname.startsWith("/activate/");
     if (skipWorkspaceFetch) {
       queueMicrotask(() => setWorkspaceReady(true));
       return;
@@ -483,16 +504,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const planAccess = useMemo(() => {
     if (!hasBuildings) {
-      return { mode: "free_tier" as const, isReadOnly: false, daysRemaining: 0 };
+      return { mode: "trial" as const, isReadOnly: false, daysRemaining: TRIAL_DAYS };
     }
     return getPlanAccess(activeBuilding, activeUnitsCount);
   }, [activeBuilding, activeUnitsCount, hasBuildings]);
 
   const t = translations[data.locale];
 
-  const handleSyncError = useCallback(() => {
-    if (cloudConnected) showToast(t.common.syncErrorToast);
-  }, [cloudConnected, showToast, t.common.syncErrorToast]);
+  const handleSyncError = useCallback(
+    (status?: number) => {
+      if (status === 402) {
+        showToast(t.common.readOnlyToast);
+        setActiveTab("subscription");
+        return;
+      }
+      if (cloudConnected) showToast(t.common.syncErrorToast);
+    },
+    [cloudConnected, showToast, t.common.readOnlyToast, t.common.syncErrorToast]
+  );
 
   const appendAuditEntry = useCallback(
     (buildingId: string, action: string, summary: string, role?: MemberRole) => {
@@ -611,16 +640,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }),
         })
           .then(async (res) => {
-            if (!res.ok) {
-              handleSyncError();
+            if (res.status === 403) {
+              await refreshWorkspace();
+              showToast(t.common.accessGateTitle);
               return;
             }
-            const json = (await res.json()) as { shareSlug?: string };
-            if (json.shareSlug && json.shareSlug !== newBuilding.shareSlug) {
+            if (!res.ok) {
+              handleSyncError(res.status);
+              return;
+            }
+            const json = (await res.json()) as {
+              shareSlug?: string;
+              planStatus?: Building["planStatus"];
+              trialEndsAt?: string;
+            };
+            setOwnedBuildingsCount((n) => n + 1);
+            if (json.shareSlug || json.trialEndsAt) {
               setData((prev) => ({
                 ...prev,
                 buildings: prev.buildings.map((b) =>
-                  b.id === buildingId ? { ...b, shareSlug: json.shareSlug! } : b
+                  b.id === buildingId
+                    ? {
+                        ...b,
+                        shareSlug: json.shareSlug ?? b.shareSlug,
+                        planStatus: json.planStatus ?? b.planStatus,
+                        trialEndsAt: json.trialEndsAt ?? b.trialEndsAt,
+                      }
+                    : b
                 ),
               }));
             }
@@ -632,7 +678,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       showToast(t.common.saved);
       return newBuilding;
     },
-    [appendAuditEntry, data.buildings, handleSyncError, showToast, t.common.saved]
+    [appendAuditEntry, data.buildings, handleSyncError, refreshWorkspace, showToast, t.common.accessGateTitle, t.common.saved]
+  );
+
+  const requestPlatformAccess = useCallback(
+    async (input: {
+      fullName: string;
+      buildingName: string;
+      city: string;
+      unitsEstimate: number;
+      phone: string;
+    }): Promise<{ ok: boolean; status?: string; error?: string }> => {
+      try {
+        const res = await fetch("/api/access-request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        const json = (await res.json()) as {
+          ok?: boolean;
+          status?: string;
+          error?: string;
+          grant?: PlatformAccessGrant | null;
+        };
+        if (!res.ok || !json.ok) {
+          return { ok: false, error: json.error ?? "request_failed" };
+        }
+        if (json.grant) {
+          setAccessGrant(json.grant);
+        }
+        if (json.status === "approved") {
+          await refreshWorkspace();
+        }
+        return { ok: true, status: json.status };
+      } catch {
+        return { ok: false, error: "network_error" };
+      }
+    },
+    [refreshWorkspace]
   );
 
   const deleteBuilding = useCallback(
@@ -1752,6 +1835,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       authRequired,
       cloudConnected,
       isFounder: effectiveIsFounder,
+      canCreateBuilding,
+      ownedBuildingsCount,
+      accessGrant,
       data,
       t,
       locale: data.locale,
@@ -1780,6 +1866,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setActiveBuildingId,
       showToast,
       refreshWorkspace,
+      requestPlatformAccess,
       createBuilding,
       deleteBuilding,
       updateBuildingSettings,
@@ -1816,6 +1903,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       authRequired,
       cloudConnected,
       effectiveIsFounder,
+      canCreateBuilding,
+      ownedBuildingsCount,
+      accessGrant,
       data,
       t,
       activeTab,
@@ -1839,6 +1929,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setActiveBuildingId,
       showToast,
       refreshWorkspace,
+      requestPlatformAccess,
       createBuilding,
       deleteBuilding,
       updateBuildingSettings,

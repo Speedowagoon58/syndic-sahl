@@ -1,4 +1,10 @@
-import type { BuildingMembership, MemberRole, MemberStatus } from "./types";
+import type {
+  AccessGrantStatus,
+  BuildingMembership,
+  MemberRole,
+  MemberStatus,
+  PlatformAccessGrant,
+} from "./types";
 
 export interface AuthenticatedClerkIdentity {
   userId: string;
@@ -85,4 +91,52 @@ export function mapMembershipRow(
       ? new Date(String(row.accepted_at)).toISOString()
       : null,
   };
+}
+
+export function normalizeAccessGrantStatus(value: unknown): AccessGrantStatus {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (raw === "approved") return "approved";
+  if (raw === "revoked") return "revoked";
+  return "pending";
+}
+
+export function mapAccessGrantRow(
+  row: Record<string, unknown>,
+  includeToken = true
+): PlatformAccessGrant {
+  const status = normalizeAccessGrantStatus(row.status);
+  return {
+    id: String(row.id),
+    email: String(row.email).trim().toLowerCase(),
+    fullName: String(row.full_name ?? ""),
+    buildingName: String(row.building_name ?? ""),
+    city: String(row.city ?? ""),
+    unitsEstimate: Number(row.units_estimate ?? 12),
+    phone: String(row.phone ?? ""),
+    status,
+    trialDays: Math.max(1, Number(row.trial_days ?? 30)),
+    maxBuildings: Math.max(1, Number(row.max_buildings ?? 1)),
+    accessToken:
+      includeToken && status !== "revoked" ? String(row.access_token ?? "") : "",
+    note: String(row.note ?? ""),
+    grantedBy: row.granted_by ? String(row.granted_by) : null,
+    clerkUserId: row.clerk_user_id ? String(row.clerk_user_id) : null,
+    createdAt: new Date(String(row.created_at)).toISOString(),
+    approvedAt: row.approved_at
+      ? new Date(String(row.approved_at)).toISOString()
+      : null,
+    claimedAt: row.claimed_at
+      ? new Date(String(row.claimed_at)).toISOString()
+      : null,
+  };
+}
+
+export function canIdentityCreateBuilding(params: {
+  isFounder: boolean;
+  grant: PlatformAccessGrant | null | undefined;
+  ownedBuildingsCount: number;
+}): boolean {
+  if (params.isFounder) return true;
+  if (!params.grant || params.grant.status !== "approved") return false;
+  return params.ownedBuildingsCount < Math.max(1, params.grant.maxBuildings);
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   activateMatchingInvites,
+  assertBuildingWritable,
   claimUnownedLegacyBuildingsIfNeeded,
   getAuthenticatedClerkIdentity,
   getUserBuildingMembership,
@@ -72,6 +73,17 @@ export async function POST(
       }
       apartmentId = membership.apartmentId;
       roleLabel = membership.role;
+    }
+
+    const writable = await assertBuildingWritable(sql, buildingId);
+    if (!writable.ok) {
+      return NextResponse.json(
+        {
+          error: "subscription_expired",
+          message: "L'essai de cet immeuble est expiré.",
+        },
+        { status: 402 }
+      );
     }
 
     const title = String(body.title ?? "").trim().slice(0, 140);

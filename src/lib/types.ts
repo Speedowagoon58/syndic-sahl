@@ -16,6 +16,7 @@ export type SubscriptionChannel = "virement" | "cashplus";
 export type SubscriptionRequestStatus = "pending" | "approved" | "rejected";
 export type MemberRole = "syndic" | "assistant" | "tenant";
 export type MemberStatus = "invited" | "active" | "revoked";
+export type AccessGrantStatus = "pending" | "approved" | "revoked";
 export type AnnouncementCategory = "info" | "ag" | "travaux" | "urgence";
 export type TicketCategory =
   | "plomberie"
@@ -152,6 +153,26 @@ export interface AuditLogEntry {
   action: string;
   summary: string;
   createdAt: string;
+}
+
+export interface PlatformAccessGrant {
+  id: string;
+  email: string;
+  fullName: string;
+  buildingName: string;
+  city: string;
+  unitsEstimate: number;
+  phone: string;
+  status: AccessGrantStatus;
+  trialDays: number;
+  maxBuildings: number;
+  accessToken: string;
+  note: string;
+  grantedBy: string | null;
+  clerkUserId: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+  claimedAt: string | null;
 }
 
 export interface AppData {

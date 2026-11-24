@@ -302,6 +302,31 @@ create policy "receipts_select_own"
     )
   );
 
+-- 6. Platform Access Grants (Founder-controlled trial invitations & requests)
+create table if not exists public.access_grants (
+  id text primary key,
+  email text not null,
+  full_name text not null default '',
+  building_name text not null default '',
+  city text not null default '',
+  units_estimate integer not null default 12,
+  phone text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'revoked')),
+  trial_days integer not null default 30,
+  max_buildings integer not null default 1,
+  access_token text not null unique,
+  note text not null default '',
+  granted_by text,
+  clerk_user_id text,
+  created_at timestamptz not null default now(),
+  approved_at timestamptz,
+  claimed_at timestamptz
+);
+
+create unique index if not exists access_grants_email_lower_idx on public.access_grants(lower(email));
+create index if not exists access_grants_status_idx on public.access_grants(status, created_at desc);
+alter table public.access_grants enable row level security;
+
 create policy "receipts_insert_own"
   on storage.objects for insert
   to authenticated
@@ -345,3 +370,28 @@ create policy "receipts_delete_own"
         and b.owner_id = (select auth.uid())
     )
   );
+
+-- 6. Platform Access Grants (Founder-controlled trial invitations & requests)
+create table if not exists public.access_grants (
+  id text primary key,
+  email text not null,
+  full_name text not null default '',
+  building_name text not null default '',
+  city text not null default '',
+  units_estimate integer not null default 12,
+  phone text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'revoked')),
+  trial_days integer not null default 30,
+  max_buildings integer not null default 1,
+  access_token text not null unique,
+  note text not null default '',
+  granted_by text,
+  clerk_user_id text,
+  created_at timestamptz not null default now(),
+  approved_at timestamptz,
+  claimed_at timestamptz
+);
+
+create unique index if not exists access_grants_email_lower_idx on public.access_grants(lower(email));
+create index if not exists access_grants_status_idx on public.access_grants(status, created_at desc);
+alter table public.access_grants enable row level security;
