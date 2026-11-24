@@ -16,6 +16,7 @@ import {
 } from "@/lib/calculations";
 import { buildFounderAccessInviteMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 import { ReceiptLightbox } from "@/components/ReceiptLightbox";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import type { Building, PlatformAccessGrant, SubscriptionRequest } from "@/lib/types";
 
 function computeFutureTrialIso(days = 30): string {
@@ -28,11 +29,7 @@ function ClerkAdminGate({ children }: { children: React.ReactNode }) {
     useApp();
 
   if (!isLoaded || !workspaceReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs text-zinc-400 dark:bg-[#09090B]">
-        {t.common.loading}
-      </div>
-    );
+    return <LoadingScreen statusText={t.common.loading} />;
   }
 
   if (!isSignedIn) {

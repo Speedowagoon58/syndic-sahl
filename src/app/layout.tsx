@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cairo, Plus_Jakarta_Sans } from "next/font/google";
 import { AppProvider } from "@/context/AppContext";
 import { AuthProvider } from "@/components/AuthProvider";
+import { SitePreloader } from "@/components/SitePreloader";
 import { APP_NAME, APP_TAGLINE_FR, STORAGE_KEY } from "@/lib/config";
 import "./globals.css";
 
@@ -63,7 +64,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-[#F6F6F4] text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100 flex flex-col transition-colors">
         <AuthProvider>
-          <AppProvider>{children}</AppProvider>
+          <AppProvider>
+            <SitePreloader />
+            {children}
+          </AppProvider>
         </AuthProvider>
       </body>
     </html>

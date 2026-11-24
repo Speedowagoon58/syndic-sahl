@@ -8,6 +8,7 @@ import { AppShell } from "@/components/AppShell";
 import { AuthControls } from "@/components/AuthControls";
 import { CommunityTab } from "@/components/CommunityTab";
 import { ExpensesTab } from "@/components/ExpensesTab";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { PaymentsTab } from "@/components/PaymentsTab";
 import { ReportTab } from "@/components/ReportTab";
@@ -49,11 +50,7 @@ export default function HomePage() {
   const [reqSubmitting, setReqSubmitting] = useState(false);
 
   if (!hydrated || !workspaceReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F6F6F4] text-xs font-medium text-zinc-500 dark:bg-[#09090B] dark:text-zinc-400">
-        {t.common.loading}
-      </div>
-    );
+    return <LoadingScreen locale={locale} statusText={t.common.loading} />;
   }
 
   if (authRequired) {
