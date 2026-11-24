@@ -107,7 +107,7 @@ export default function HomePage() {
         </header>
 
         <main className="mx-auto w-full max-w-md py-8">
-          <div className="rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="ss-animate-fade-up rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
               <Lock className="h-4 w-4" />
             </div>
@@ -212,7 +212,7 @@ export default function HomePage() {
 
         <main className="mx-auto w-full max-w-md py-8">
           {canCreate ? (
-            <div className="rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+            <div className="ss-animate-fade-up rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
               <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
                 <Building2 className="h-4 w-4" />
               </div>
@@ -279,7 +279,7 @@ export default function HomePage() {
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-zinc-200/90 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+            <div className="ss-animate-fade-up rounded-xl border border-zinc-200/90 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
               <div className="text-center">
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
                   <Lock className="h-4 w-4" />
@@ -426,7 +426,7 @@ export default function HomePage() {
         </header>
 
         <main className="mx-auto w-full max-w-md py-8">
-          <div className="rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="ss-animate-fade-up rounded-xl border border-zinc-200/90 bg-white p-6 text-center shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
             <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
               {t.header.roleBadge.tenant}
             </span>
@@ -456,12 +456,14 @@ export default function HomePage() {
   return (
     <>
       <AppShell onOpenOnboarding={() => setOnboardingOpen(true)}>
-        {activeTab === "payments" && <PaymentsTab />}
-        {activeTab === "expenses" && <ExpensesTab />}
-        {activeTab === "community" && <CommunityTab />}
-        {activeTab === "report" && <ReportTab />}
-        {activeTab === "subscription" && <SubscriptionTab />}
-        {activeTab === "settings" && <SettingsTab />}
+        <div key={activeTab} className="ss-animate-tab">
+          {activeTab === "payments" && <PaymentsTab />}
+          {activeTab === "expenses" && <ExpensesTab />}
+          {activeTab === "community" && <CommunityTab />}
+          {activeTab === "report" && <ReportTab />}
+          {activeTab === "subscription" && <SubscriptionTab />}
+          {activeTab === "settings" && <SettingsTab />}
+        </div>
       </AppShell>
 
       <OnboardingModal
@@ -470,7 +472,7 @@ export default function HomePage() {
       />
 
       {toast && (
-        <div className="no-print fixed bottom-20 end-4 z-50 max-w-sm rounded-lg bg-zinc-900 px-4 py-3 text-xs font-semibold text-white shadow-xl dark:bg-zinc-100 dark:text-zinc-950 lg:bottom-6">
+        <div className="no-print ss-animate-toast fixed bottom-20 end-4 z-50 max-w-sm rounded-lg bg-zinc-900 px-4 py-3 text-xs font-semibold text-white shadow-xl dark:bg-zinc-100 dark:text-zinc-950 lg:bottom-6">
           {toast}
         </div>
       )}

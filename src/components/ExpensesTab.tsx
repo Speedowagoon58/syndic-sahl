@@ -144,7 +144,7 @@ export function ExpensesTab() {
       </div>
 
       {/* Unified Spend Summary & Stacked Distribution Bar */}
-      <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
+      <div className="ss-animate-fade-up overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
         <div className="grid grid-cols-1 divide-y divide-zinc-200/80 dark:divide-zinc-800 sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
           <div className="p-5">
             <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-400 dark:text-zinc-500">
@@ -186,7 +186,7 @@ export function ExpensesTab() {
               return (
                 <div
                   key={cat}
-                  className={`h-full ${CATEGORY_COLORS[cat]}`}
+                  className={`h-full transition-[width] duration-700 ease-out ${CATEGORY_COLORS[cat]}`}
                   style={{ width: `${pct}%` }}
                   title={`${t.expenses.categories[cat]}: ${formatMAD(total, locale)}`}
                 />
@@ -324,11 +324,11 @@ export function ExpensesTab() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="expense-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
+          className="ss-animate-backdrop fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
           onClick={() => setShowModal(false)}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+            className="ss-animate-modal w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">

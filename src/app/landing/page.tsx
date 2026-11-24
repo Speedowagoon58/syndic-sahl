@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { AuthControls } from "@/components/AuthControls";
+import { Reveal } from "@/components/Reveal";
 import { APP_NAME, APP_NAME_AR, PLANS } from "@/lib/config";
 
 export default function LandingPage() {
@@ -91,10 +92,14 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="mx-auto max-w-6xl px-4 pt-14 pb-12 sm:px-6 sm:pt-20">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+      <section className="relative mx-auto max-w-6xl overflow-hidden px-4 pt-14 pb-12 sm:px-6 sm:pt-20">
+        <div
+          aria-hidden="true"
+          className="ss-animate-float pointer-events-none absolute -top-24 end-10 h-80 w-80 rounded-full bg-teal-500/10 blur-3xl dark:bg-teal-400/10"
+        />
+        <div className="relative max-w-3xl">
+          <div className="ss-animate-fade-up inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600" />
             <span>
               {isAr
                 ? "مصمم خصيصاً لإقامات وعمارات المغرب (القانون 18-00)"
@@ -102,47 +107,48 @@ export default function LandingPage() {
             </span>
           </div>
 
-          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100 sm:text-5xl sm:leading-[1.12]">
+          <h1 className="ss-animate-fade-up ss-delay-1 mt-5 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100 sm:text-5xl sm:leading-[1.12]">
             {isAr
               ? "تسيير السانديك بكل شفافية، بلا خلافات في مجموعات واتساب."
               : "La gestion de syndic claire, sans conflits dans le groupe WhatsApp."}
           </h1>
 
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-base">
+          <p className="ss-animate-fade-up ss-delay-2 mt-4 max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-base">
             {isAr
               ? "سجل الأداءات الشهرية، أرسل وصولات PDF وتذكيرات ودية بالدارجة أو الفرنسية عبر واتساب، وشارك رابطاً واحداً مع الجيران للاطلاع على رصيد الصندوق وصور الفواتير بدون تحميل أي تطبيق."
               : "Enregistrez les cotisations, envoyez des quittances PDF et rappels courtois en Darija ou Français sur WhatsApp, et partagez un lien unique où chaque voisin consulte la caisse et les photos des factures sans installer d'application."}
           </p>
 
-          <div className="mt-7 flex flex-wrap items-center gap-3">
+          <div className="ss-animate-fade-up ss-delay-3 mt-7 flex flex-wrap items-center gap-3">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-5 py-2.5 text-xs font-medium text-white shadow-xs hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+              className="ss-btn-press group inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-5 py-2.5 text-xs font-medium text-white shadow-xs hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
             >
               <span>
                 {isAr
                   ? "طلب تجربة مجانية (30 يوماً بدعوة)"
                   : "Demander un accès essai (30 jours)"}
               </span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
 
             <Link
               href="/r/residence-atlas"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-4 py-2.5 text-xs font-medium text-zinc-800 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="ss-btn-press group inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-4 py-2.5 text-xs font-medium text-zinc-800 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               <span>
                 {isAr
                   ? "معاينة رابط السكان (Résidence Atlas)"
                   : "Voir un exemple de lien résidents"}
               </span>
-              <ArrowUpRight className="h-3.5 w-3.5 text-zinc-400" />
+              <ArrowUpRight className="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Link>
           </div>
         </div>
 
         {/* Live Product Preview Strip */}
-        <div className="mt-12 grid grid-cols-1 divide-y divide-zinc-200/80 overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:divide-zinc-800 dark:border-zinc-800 dark:bg-[#111113] sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
+        <Reveal delayMs={120}>
+          <div className="mt-12 grid grid-cols-1 divide-y divide-zinc-200/80 overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:divide-zinc-800 dark:border-zinc-800 dark:bg-[#111113] sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
           <div className="p-6">
             <div className="flex items-center gap-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
               <Link2 className="h-4 w-4 text-zinc-400" />
@@ -190,13 +196,15 @@ export default function LandingPage() {
                 : "Imprimez ou exportez en PDF le bilan des encaissements, la répartition des charges et l'état des arriérés par lot."}
             </p>
           </div>
-        </div>
+          </div>
+        </Reveal>
       </section>
 
       {/* Before vs After Comparison */}
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-zinc-200/90 bg-white p-6 dark:border-zinc-800 dark:bg-[#111113]">
+          <Reveal>
+            <div className="ss-card-interactive h-full rounded-xl border border-zinc-200/90 bg-white p-6 dark:border-zinc-800 dark:bg-[#111113]">
             <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
               {isAr ? "الطريقة التقليدية" : "Gestion classique"}
             </span>
@@ -225,9 +233,11 @@ export default function LandingPage() {
                   : "Usure rapide du syndic bénévole face aux impayés"}
               </li>
             </ul>
-          </div>
+            </div>
+          </Reveal>
 
-          <div className="rounded-xl border border-zinc-900 bg-white p-6 dark:border-zinc-200 dark:bg-[#111113]">
+          <Reveal delayMs={100}>
+            <div className="ss-card-interactive h-full rounded-xl border border-zinc-900 bg-white p-6 dark:border-zinc-200 dark:bg-[#111113]">
             <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-700 dark:text-emerald-400">
               {isAr ? "مع سانديك ساهل" : `Avec ${APP_NAME}`}
             </span>
@@ -262,70 +272,79 @@ export default function LandingPage() {
                 </span>
               </li>
             </ul>
-          </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Transparent Pricing */}
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
-            {isAr
-              ? "تسعيرة واضحة تؤدى من صندوق العمارة"
-              : "Tarification simple, prise en charge par la caisse de l'immeuble"}
-          </h2>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {isAr
-              ? "الأداء عبر تحويل بنكي (RIB) أو CashPlus — بدون بطاقة بنكية."
-              : "Règlement par virement bancaire ou CashPlus — aucune carte bancaire requise."}
-          </p>
-        </div>
+        <Reveal>
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
+              {isAr
+                ? "تسعيرة واضحة تؤدى من صندوق العمارة"
+                : "Tarification simple, prise en charge par la caisse de l'immeuble"}
+            </h2>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {isAr
+                ? "الأداء عبر تحويل بنكي (RIB) أو CashPlus — بدون بطاقة بنكية."
+                : "Règlement par virement bancaire ou CashPlus — aucune carte bancaire requise."}
+            </p>
+          </div>
+        </Reveal>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-zinc-200/90 bg-white p-6 dark:border-zinc-800 dark:bg-[#111113]">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-              {isAr ? "تجربة بدعوة مسبقة" : "Essai sur invitation"}
-            </span>
-            <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
-              0 MAD
-            </p>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {isAr
-                ? "30 يوماً مجاناً بدعوة من الإدارة، ثم اختيار الباقة"
-                : "30 jours d'essai gratuit sur invitation, puis abonnement"}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-zinc-200/90 bg-white p-6 dark:border-zinc-800 dark:bg-[#111113]">
-            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              {isAr ? PLANS.semi_annual.labelAr : PLANS.semi_annual.labelFr}
-            </span>
-            <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
-              {PLANS.semi_annual.priceMAD} MAD
-            </p>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {isAr ? "شقق غير محدودة لمدة 6 أشهر" : "Lots illimités pendant 6 mois"}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-zinc-900 bg-white p-6 ring-1 ring-zinc-900 dark:border-zinc-100 dark:bg-[#111113] dark:ring-zinc-100">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                {isAr ? PLANS.annual.labelAr : PLANS.annual.labelFr}
+          <Reveal delayMs={0}>
+            <div className="ss-card-interactive h-full rounded-xl border border-zinc-200/90 bg-white p-6 dark:border-zinc-800 dark:bg-[#111113]">
+              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                {isAr ? "تجربة بدعوة مسبقة" : "Essai sur invitation"}
               </span>
-              <span className="rounded-md bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-white dark:bg-zinc-100 dark:text-zinc-950">
-                {isAr ? "الأكثر اختياراً" : "Recommandé"}
-              </span>
+              <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
+                0 MAD
+              </p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                {isAr
+                  ? "30 يوماً مجاناً بدعوة من الإدارة، ثم اختيار الباقة"
+                  : "30 jours d'essai gratuit sur invitation, puis abonnement"}
+              </p>
             </div>
-            <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
-              {PLANS.annual.priceMAD} MAD
-            </p>
-            <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              {isAr
-                ? "~5 دراهم فقط للشقة في الشهر (لعمارة من 20 شقة)"
-                : "Soit ~5 MAD / appartement / mois (pour 20 lots)"}
-            </p>
-          </div>
+          </Reveal>
+
+          <Reveal delayMs={90}>
+            <div className="ss-card-interactive h-full rounded-xl border border-zinc-200/90 bg-white p-6 dark:border-zinc-800 dark:bg-[#111113]">
+              <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                {isAr ? PLANS.semi_annual.labelAr : PLANS.semi_annual.labelFr}
+              </span>
+              <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
+                {PLANS.semi_annual.priceMAD} MAD
+              </p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                {isAr ? "شقق غير محدودة لمدة 6 أشهر" : "Lots illimités pendant 6 mois"}
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delayMs={180}>
+            <div className="ss-card-interactive h-full rounded-xl border border-zinc-900 bg-white p-6 ring-1 ring-zinc-900 dark:border-zinc-100 dark:bg-[#111113] dark:ring-zinc-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                  {isAr ? PLANS.annual.labelAr : PLANS.annual.labelFr}
+                </span>
+                <span className="rounded-md bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-white dark:bg-zinc-100 dark:text-zinc-950">
+                  {isAr ? "الأكثر اختياراً" : "Recommandé"}
+                </span>
+              </div>
+              <p className="mt-2 tabular-nums text-2xl font-semibold text-zinc-950 dark:text-zinc-100">
+                {PLANS.annual.priceMAD} MAD
+              </p>
+              <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                {isAr
+                  ? "~5 دراهم فقط للشقة في الشهر (لعمارة من 20 شقة)"
+                  : "Soit ~5 MAD / appartement / mois (pour 20 lots)"}
+              </p>
+            </div>
+          </Reveal>
         </div>
       </section>
 

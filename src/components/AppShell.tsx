@@ -181,14 +181,14 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium ${
+                className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-200 ${
                   isActive
                     ? "bg-zinc-900 text-white shadow-2xs dark:bg-zinc-100 dark:text-zinc-950"
                     : "text-zinc-600 hover:bg-zinc-200/50 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
                 }`}
               >
                 <Icon
-                  className={`h-4 w-4 shrink-0 ${
+                  className={`h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
                     isActive
                       ? "text-zinc-200 dark:text-zinc-800"
                       : "text-zinc-400 dark:text-zinc-500"
@@ -461,14 +461,14 @@ export function AppShell({ children, onOpenOnboarding }: AppShellProps) {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`relative flex flex-col items-center justify-center rounded-lg py-1.5 text-[10px] font-medium transition-colors ${
+                className={`group relative flex flex-col items-center justify-center rounded-lg py-1.5 text-[10px] font-medium transition-all duration-200 ${
                   isActive
                     ? "text-zinc-950 font-semibold dark:text-zinc-100"
                     : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
                 }`}
               >
                 <Icon
-                  className={`h-4 w-4 ${
+                  className={`h-4 w-4 transition-transform duration-200 group-hover:scale-110 ${
                     isActive
                       ? "text-zinc-950 dark:text-zinc-100"
                       : "text-zinc-400 dark:text-zinc-500"

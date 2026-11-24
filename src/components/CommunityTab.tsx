@@ -342,7 +342,7 @@ export function CommunityTab() {
         {showAnnForm && (
           <form
             onSubmit={handleCreateAnnouncement}
-            className="border-b border-zinc-100 bg-zinc-50/70 p-5 space-y-3 dark:border-zinc-800 dark:bg-zinc-950"
+            className="ss-animate-tab border-b border-zinc-100 bg-zinc-50/70 p-5 space-y-3 dark:border-zinc-800 dark:bg-zinc-950"
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
               <div className="sm:col-span-8">
@@ -493,7 +493,7 @@ export function CommunityTab() {
       </div>
 
       {/* Section 2: Maintenance Tickets */}
-      <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
+      <div className="ss-animate-fade-up ss-delay-1 overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:border-zinc-800 dark:bg-[#111113]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
@@ -539,7 +539,7 @@ export function CommunityTab() {
         {showTicketForm && (
           <form
             onSubmit={handleCreateTicket}
-            className="border-b border-zinc-100 bg-zinc-50/70 p-5 space-y-3 dark:border-zinc-800 dark:bg-zinc-950"
+            className="ss-animate-tab border-b border-zinc-100 bg-zinc-50/70 p-5 space-y-3 dark:border-zinc-800 dark:bg-zinc-950"
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
               <div className="sm:col-span-5">

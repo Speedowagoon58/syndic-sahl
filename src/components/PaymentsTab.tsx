@@ -324,7 +324,7 @@ export function PaymentsTab() {
       </div>
 
       {/* Unified Financial Metrics Ledger Strip */}
-      <div className="grid grid-cols-1 divide-y divide-zinc-200/80 overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:divide-zinc-800 dark:border-zinc-800 dark:bg-[#111113] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+      <div className="ss-animate-fade-up grid grid-cols-1 divide-y divide-zinc-200/80 overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs dark:divide-zinc-800 dark:border-zinc-800 dark:bg-[#111113] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
         <div className="p-5">
           <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-400 dark:text-zinc-500">
             {t.kpi.treasuryBalance}
@@ -494,7 +494,7 @@ export function PaymentsTab() {
             {t.payments.noResults}
           </div>
         ) : viewMode === "matrix" ? (
-          <div className="overflow-x-auto">
+          <div key="matrix" className="ss-animate-tab overflow-x-auto">
             <table className="w-full text-start border-collapse">
               <thead>
                 <tr className="border-b border-zinc-200/80 bg-zinc-50/40 text-[11px] font-medium uppercase tracking-[0.04em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-500">
@@ -587,7 +587,7 @@ export function PaymentsTab() {
             </table>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div key="monthly" className="ss-animate-tab overflow-x-auto">
             <table className="w-full text-start border-collapse">
               <thead>
                 <tr className="border-b border-zinc-200/80 bg-zinc-50/40 text-[11px] font-medium uppercase tracking-[0.05em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-500">
@@ -794,11 +794,11 @@ export function PaymentsTab() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="payment-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
+          className="ss-animate-backdrop fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
           onClick={() => setModalInfo(null)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+            className="ss-animate-modal w-full max-w-md overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
