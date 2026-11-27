@@ -24,7 +24,8 @@ export const metadata: Metadata = {
     "Application simple et transparente de gestion de syndic de copropriété au Maroc : suivi des cotisations, reçus PDF WhatsApp, photos des factures et portail résidents sans application.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon.svg",
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
     apple: "/icon.svg",
   },
   appleWebApp: {
