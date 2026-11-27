@@ -36,158 +36,146 @@ export function LoadingScreen({
       aria-live="polite"
       aria-label={statusText || defaultStatus}
       className={`no-print ss-curtain ${
-        overlay ? "fixed inset-0 z-[100]" : "relative min-h-screen w-full"
-      } flex flex-col justify-between overflow-hidden bg-[#F6F6F4] text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100 ${
+        overlay ? "fixed inset-0 z-[100]" : "min-h-screen w-full"
+      } flex flex-col justify-between bg-[#F6F6F4] p-4 text-zinc-950 dark:bg-[#09090B] dark:text-zinc-100 ${
         exiting ? "ss-curtain-exit" : ""
       }`}
     >
-      {/* Subtle architectural blueprint grid */}
-      <div
-        aria-hidden="true"
-        className="ss-animate-grid pointer-events-none absolute -inset-6 opacity-[0.38] dark:opacity-[0.18]"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(15, 118, 110, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(15, 118, 110, 0.08) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-
-      {/* Soft centered emerald aura */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-500/10 blur-3xl dark:bg-teal-400/10"
-      />
-
-      {/* Editorial top corner hairlines */}
-      <header className="relative z-10 flex w-full items-center justify-between px-6 py-5 sm:px-10 sm:py-7">
-        <div className="flex items-center gap-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-teal-400" />
-          <span>{APP_NAME}</span>
+      {/* Matching Main Page Header */}
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between py-2">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 text-xs font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
+            S
+          </div>
+          <span className="text-sm font-semibold tracking-tight">
+            {isAr ? APP_NAME_AR : APP_NAME}
+          </span>
         </div>
-        <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">
-          MAROC • LOI 18-00
+
+        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600 dark:bg-emerald-400" />
+          <span>{isAr ? "القانون 18-00" : "Loi 18-00"}</span>
         </div>
       </header>
 
-      {/* Centerpiece architectural emblem + masked wordmark + hairline progress */}
-      <main className="relative z-10 mx-auto flex w-full max-w-sm flex-col items-center px-6 text-center">
-        <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-3xl border border-zinc-200/80 bg-white/80 shadow-xl shadow-teal-950/5 backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/75 dark:shadow-black/40">
-          <svg
-            viewBox="0 0 120 120"
-            className="h-16 w-16"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            {/* Building roofline & facade stroke-draw */}
-            <path
-              d="M28 98V42L60 24L92 42V98H28Z"
-              className="ss-animate-draw stroke-[#0F766E] dark:stroke-[#2DD4BF]"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            {/* Architectural center ridge */}
-            <path
-              d="M60 24V98"
-              className="stroke-teal-700/20 dark:stroke-teal-300/20"
-              strokeWidth="1.5"
-              strokeDasharray="3 3"
-            />
-            {/* 4 apartment windows lighting up sequentially */}
-            <rect
-              x="38"
-              y="49"
-              width="13"
-              height="13"
-              rx="3"
-              className="ss-animate-window-1 fill-[#0F766E] dark:fill-[#14B8A6]"
-            />
-            <rect
-              x="69"
-              y="49"
-              width="13"
-              height="13"
-              rx="3"
-              className="ss-animate-window-2 fill-[#0F766E] dark:fill-[#14B8A6]"
-            />
-            <rect
-              x="38"
-              y="68"
-              width="13"
-              height="13"
-              rx="3"
-              className="ss-animate-window-3 fill-[#0F766E] dark:fill-[#14B8A6]"
-            />
-            <rect
-              x="69"
-              y="68"
-              width="13"
-              height="13"
-              rx="3"
-              className="ss-animate-window-4 fill-[#0F766E] dark:fill-[#14B8A6]"
-            />
-            {/* Arched entrance */}
-            <path
-              d="M52 98V83C52 78.5817 55.5817 75 60 75C64.4183 75 68 78.5817 68 83V98"
-              className="ss-animate-draw stroke-[#0F766E] dark:stroke-[#2DD4BF]"
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
-            {/* Signature amber verified seal */}
-            <g className="ss-animate-badge">
-              <circle cx="91" cy="29" r="13" fill="#F59E0B" />
+      {/* Matching Centered Card */}
+      <main className="mx-auto w-full max-w-md py-8">
+        <div className="ss-animate-fade-up rounded-xl border border-zinc-200/90 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-[#111113]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-zinc-200/80 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+            <svg
+              viewBox="0 0 120 120"
+              className="h-9 w-9"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              {/* Building roofline & facade stroke-draw */}
               <path
-                d="M85.5 29.5L89 33L96.5 25.5"
-                stroke="#FFFFFF"
-                strokeWidth="2.8"
+                d="M28 98V42L60 24L92 42V98H28Z"
+                className="ss-animate-draw stroke-zinc-900 dark:stroke-zinc-100"
+                strokeWidth="4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-            </g>
-          </svg>
-        </div>
+              {/* 4 apartment windows lighting up sequentially */}
+              <rect
+                x="39"
+                y="49"
+                width="12"
+                height="12"
+                rx="2.5"
+                className="ss-animate-window-1 fill-zinc-900 dark:fill-zinc-100"
+              />
+              <rect
+                x="69"
+                y="49"
+                width="12"
+                height="12"
+                rx="2.5"
+                className="ss-animate-window-2 fill-zinc-900 dark:fill-zinc-100"
+              />
+              <rect
+                x="39"
+                y="68"
+                width="12"
+                height="12"
+                rx="2.5"
+                className="ss-animate-window-3 fill-zinc-900 dark:fill-zinc-100"
+              />
+              <rect
+                x="69"
+                y="68"
+                width="12"
+                height="12"
+                rx="2.5"
+                className="ss-animate-window-4 fill-zinc-900 dark:fill-zinc-100"
+              />
+              {/* Arched entrance */}
+              <path
+                d="M52 98V83C52 78.5817 55.5817 75 60 75C64.4183 75 68 78.5817 68 83V98"
+                className="ss-animate-draw stroke-zinc-900 dark:stroke-zinc-100"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+              {/* Emerald verified badge */}
+              <g className="ss-animate-badge">
+                <circle cx="91" cy="29" r="13" fill="#059669" />
+                <path
+                  d="M85.5 29.5L89 33L96.5 25.5"
+                  stroke="#FFFFFF"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </g>
+            </svg>
+          </div>
 
-        {/* Masked wordmark reveal */}
-        <div className="overflow-hidden">
-          <h1 className="ss-animate-word text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-[26px]">
-            {isAr ? APP_NAME_AR : APP_NAME}
-          </h1>
-        </div>
+          <div className="mt-4 overflow-hidden text-center">
+            <h1 className="ss-animate-word text-base font-semibold tracking-tight text-zinc-950 dark:text-zinc-100">
+              {isAr ? APP_NAME_AR : APP_NAME}
+            </h1>
+          </div>
 
-        <p
-          dir={isAr ? "rtl" : "ltr"}
-          className="mt-2 min-h-[1.25rem] text-xs font-medium text-zinc-500 transition-opacity duration-300 dark:text-zinc-400"
-        >
-          {statusText || defaultStatus}
-        </p>
+          <div
+            dir={isAr ? "rtl" : "ltr"}
+            className="mt-2 flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400"
+          >
+            <span className="truncate font-medium">
+              {statusText || defaultStatus}
+            </span>
+            <span className="tabular-nums font-semibold text-zinc-900 dark:text-zinc-100">
+              {formattedPct !== null ? `${formattedPct}%` : "•••"}
+            </span>
+          </div>
 
-        {/* Hairline 2px progress track */}
-        <div className="mt-7 w-full max-w-[240px]">
-          <div className="relative h-[2px] w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+          {/* Monochrome Progress Track */}
+          <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
             {clampedProgress !== null ? (
               <div
-                className="relative h-full rounded-full bg-gradient-to-r from-[#0F766E] via-[#14B8A6] to-[#F59E0B] transition-[width] duration-200 ease-out"
+                className="relative h-full rounded-full bg-zinc-900 transition-[width] duration-200 ease-out dark:bg-zinc-100"
                 style={{ width: `${clampedProgress}%` }}
               >
-                <span className="ss-animate-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+                <span className="ss-animate-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-zinc-900/35" />
               </div>
             ) : (
-              <div className="ss-animate-shimmer h-full w-2/5 rounded-full bg-gradient-to-r from-transparent via-[#0F766E] to-transparent dark:via-[#2DD4BF]" />
+              <div className="ss-animate-shimmer h-full w-2/5 rounded-full bg-gradient-to-r from-transparent via-zinc-900 to-transparent dark:via-zinc-100" />
             )}
+          </div>
+
+          {/* Mini-Ledger Skeleton Strip matching KPI Cards */}
+          <div className="mt-5 grid grid-cols-3 divide-x divide-zinc-100 rounded-lg border border-zinc-100 bg-zinc-50/70 dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950/60">
+            {[0, 1, 2].map((idx) => (
+              <div key={idx} className="p-2.5">
+                <div className="h-2 w-10 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                <div className="mt-1.5 h-3 w-14 animate-pulse rounded bg-zinc-300/80 dark:bg-zinc-700/80" />
+              </div>
+            ))}
           </div>
         </div>
       </main>
 
-      {/* Editorial footer with live tabular percentage */}
-      <footer className="relative z-10 flex w-full items-center justify-between px-6 py-5 sm:px-10 sm:py-7">
-        <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">
-          {isAr ? "إدارة شفافة" : "EXPERIENCE"}
-        </span>
-        <span className="tabular-nums text-xs font-semibold tracking-wider text-zinc-600 dark:text-zinc-300">
-          {formattedPct !== null ? `${formattedPct}%` : "•••"}
-        </span>
-      </footer>
+      <div />
     </div>
   );
 }
